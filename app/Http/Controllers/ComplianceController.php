@@ -6,24 +6,67 @@ use App\Models\ComplianceTask;
 use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class ComplianceController extends Controller
 {
-    public function index()
+    /**
+     * Display the compliance dashboard with a list of tasks.
+     * Admin/HR see all, Employee sees only their own.
+     */
+    public function index(Request $request)
     {
-        $complianceTasks = ComplianceTask::with('employee')->get();
-        $employees = Employee::all();
+        $user = Auth::user();
+        $employees = Employee::select('id', 'name', 'email')->get();
+
+        $query = ComplianceTask::with('employee');
+
+        if (strtolower($user->role) === 'employee') {
+            $query->where('employee_id', $user->employee->id ?? 0);
+        }
+
+        // Handle search
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('task_id', 'like', '%' . $search . '%')
+                  ->orWhereHas('employee', function ($q) use ($search) {
+                      $q->where('name', 'like', '%' . $search . '%');
+                  });
+            });
+        }
+
+        $complianceTasks = $query->paginate(6); 
         return view('dashboard.compliance', compact('complianceTasks', 'employees'));
     }
 
+    /**
+     * Store a new compliance task (Admin/HR only).
+     */
     public function store(Request $request)
     {
+        $user = Auth::user();
+        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $validator = Validator::make($request->all(), [
-            'compliance_type' => 'required|in:PAYE,NSSF,NHIF',
+            'type' => ['required', 'string', Rule::in(['PAYE', 'NSSF', 'NHIF', 'WCF', 'SDL'])],
             'employee_id' => 'nullable|exists:employees,id',
-            'due_date' => 'required|date',
+            'due_date' => 'required|date|after_or_equal:today',
             'amount' => 'nullable|numeric|min:0',
-            'details' => 'nullable|string'
+            'details' => 'nullable|string|max:1000',
+        ], [
+            'type.required' => 'Please select a compliance type.',
+            'type.in' => 'Invalid compliance type selected.',
+            'employee_id.exists' => 'The selected employee does not exist.',
+            'due_date.required' => 'Please provide a due date.',
+            'due_date.date' => 'The due date must be a valid date.',
+            'due_date.after_or_equal' => 'The due date cannot be in the past.',
+            'amount.numeric' => 'The amount must be a valid number.',
+            'amount.min' => 'The amount cannot be negative.',
+            'details.max' => 'The details cannot exceed 1000 characters.',
         ]);
 
         if ($validator->fails()) {
@@ -31,38 +74,74 @@ class ComplianceController extends Controller
         }
 
         ComplianceTask::create([
-            'task_id' => 'CMP-' . uniqid(),
-            'type' => $request->compliance_type,
-            'employee_id' => $request->employee_id,
+            'task_id' => 'CMP-' . strtoupper(uniqid()),
+            'type' => $request->type,
+            'employee_id' => $request->employee_id ?: null,
             'due_date' => $request->due_date,
-            'amount' => $request->amount,
+            'amount' => $request->amount ?: null,
             'details' => $request->details,
-            'status' => 'Pending'
+            'status' => 'Pending',
+            'created_by' => $user->id,
         ]);
 
-        return redirect()->route('compliance.index')->with('success', 'Compliance task submitted successfully');
+        return redirect()->route('compliance.index')->with('success', 'Compliance task created successfully.');
     }
 
+    /**
+     * Get a compliance task for editing (Admin/HR only).
+     */
     public function edit($id)
     {
-        $task = ComplianceTask::findOrFail($id);
+        $user = Auth::user();
+        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            return response()->json(['error' => 'Unauthorized action.'], 403);
+        }
+
+        $task = ComplianceTask::with('employee')->find($id);
+
+        if (!$task) {
+            return response()->json(['error' => 'Compliance task not found.'], 404);
+        }
+
         return response()->json([
+            'id' => $task->id,
+            'task_id' => $task->task_id,
             'type' => $task->type,
             'employee_id' => $task->employee_id,
+            'employee_name' => $task->employee ? $task->employee->name : null,
             'due_date' => $task->due_date->format('Y-m-d'),
             'amount' => $task->amount,
-            'details' => $task->details
+            'details' => $task->details,
+            'status' => $task->status,
         ]);
     }
 
+    /**
+     * Update an existing compliance task (Admin/HR only).
+     */
     public function update(Request $request, $id)
     {
+        $user = Auth::user();
+        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $validator = Validator::make($request->all(), [
-            'compliance_type' => 'required|in:PAYE,NSSF,NHIF',
+            'type' => ['required', 'string', Rule::in(['PAYE', 'NSSF', 'NHIF', 'WCF', 'SDL'])],
             'employee_id' => 'nullable|exists:employees,id',
-            'due_date' => 'required|date',
+            'due_date' => 'required|date|after_or_equal:today',
             'amount' => 'nullable|numeric|min:0',
-            'details' => 'nullable|string'
+            'details' => 'nullable|string|max:1000',
+        ], [
+            'type.required' => 'Please select a compliance type.',
+            'type.in' => 'Invalid compliance type selected.',
+            'employee_id.exists' => 'The selected employee does not exist.',
+            'due_date.required' => 'Please provide a due date.',
+            'due_date.date' => 'The due date must be a valid date.',
+            'due_date.after_or_equal' => 'The due date cannot be in the past.',
+            'amount.numeric' => 'The amount must be a valid number.',
+            'amount.min' => 'The amount cannot be negative.',
+            'details.max' => 'The details cannot exceed 1000 characters.',
         ]);
 
         if ($validator->fails()) {
@@ -71,14 +150,36 @@ class ComplianceController extends Controller
 
         $task = ComplianceTask::findOrFail($id);
         $task->update([
-            'type' => $request->compliance_type,
-            'employee_id' => $request->employee_id,
+            'type' => $request->type,
+            'employee_id' => $request->employee_id ?: null,
             'due_date' => $request->due_date,
-            'amount' => $request->amount,
+            'amount' => $request->amount ?: null,
             'details' => $request->details,
-            'status' => 'Pending'
+            'status' => 'Pending',
+            'updated_by' => $user->id,
         ]);
 
-        return redirect()->route('dashboard.compliance')->with('success', 'Compliance task updated successfully');
+        return redirect()->route('compliance.index')->with('success', 'Compliance task updated successfully.');
+    }
+
+    /**
+     * Submit a compliance task (Employee can submit only their own).
+     */
+    public function submit(Request $request, $id)
+    {
+        $user = Auth::user();
+        $task = ComplianceTask::findOrFail($id);
+
+        if (strtolower($user->role) === 'employee' && ($task->employee_id != ($user->employee->id ?? 0))) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $task->update([
+            'status' => 'Submitted',
+            'submitted_by' => $user->id,
+            'submitted_at' => now(),
+        ]);
+
+        return redirect()->route('compliance.index')->with('success', 'Compliance task submitted successfully.');
     }
 }

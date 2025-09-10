@@ -4,32 +4,51 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Payslip;
-use App\Models\Setting;
-use App\Models\LeaveRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Routing\Controller;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class EmployeePortalController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth');
+    }
+
+    /**
+     * Show Employee Portal dashboard
+     */
     public function index()
     {
         $user = Auth::user();
-        $employee = Employee::findOrFail($user->employee_id);
-        $payslips = Payslip::where('employee_id', $employee->id)->latest()->get();
-        $leaveBalances = [
-            'sick_leave_balance' => $employee->sick_leave_balance ?? 14,
-            'vacation_leave_balance' => $employee->vacation_leave_balance ?? 28,
-            'maternity_leave_balance' => $employee->maternity_leave_balance ?? 84,
-        ];
-        return view('dashboard.employee_portal', compact('employee', 'payslips', 'leaveBalances'));
+
+        if (in_array($user->role, ['admin', 'hr'])) {
+            // Admin/HR wanaona employees wote
+            $employees = Employee::with('payslips')->get();
+            $payslips = Payslip::with('employee')->latest()->take(50)->get();
+        } else {
+            $employee = Employee::where('user_id', $user->id)->firstOrFail();
+            $employees = collect([$employee]);
+            $payslips = $employee->payslips()->latest()->get();
+        }
+
+        return view('dashboard.employeeportal', compact('employees', 'payslips'));
     }
 
-    public function update(Request $request)
+    /**
+     * Update employee information
+     */
+    public function update(Request $request, $id = null)
     {
         $user = Auth::user();
-        $employee = Employee::findOrFail($user->employee_id);
+
+        if ($user->role === 'employee') {
+            $employee = Employee::where('user_id', $user->id)->firstOrFail();
+        } else {
+            $employee = Employee::findOrFail($id);
+        }
 
         $validator = Validator::make($request->all(), [
             'phone' => 'nullable|string|max:20',
@@ -42,22 +61,29 @@ class EmployeePortalController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $employee->update($request->all());
+        $employee->update($request->only(['phone','address','bank_name','account_number']));
 
-        return redirect()->route('employee.portal')->with('success', 'Details updated successfully. Pending approval.');
+        return redirect()->route('employee.portal')->with('success', 'Details updated successfully.');
     }
 
+    /**
+     * Download payslip PDF
+     */
     public function downloadPayslip($id)
     {
         $user = Auth::user();
-        $payslip = Payslip::where('employee_id', $user->employee_id)->findOrFail($id);
-        $settings = Setting::first();
+        $payslip = Payslip::with('employee')->findOrFail($id);
+
+        // Employee wa kawaida hawawezi download payslip za wengine
+        if ($user->role === 'employee' && $payslip->employee->user_id !== $user->id) {
+            return redirect()->back()->with('error', 'Unauthorized to download this payslip.');
+        }
 
         $pdf = Pdf::loadView('payslip.download', [
             'payslip' => $payslip,
             'employee' => $payslip->employee,
-            'settings' => $settings,
         ]);
-        return $pdf->download('payslip_' . $payslip->payroll_id . '.pdf');
+
+        return $pdf->download('payslip_' . $payslip->employee->employee_id . '_' . $payslip->period . '.pdf');
     }
 }

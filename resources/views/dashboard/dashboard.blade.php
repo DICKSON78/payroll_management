@@ -1,9 +1,9 @@
 @extends('layout.global')
 
-@section('title', 'Employees')
+@section('title', 'Dashboard')
 
 @section('header-title')
-    Employees
+    Dashboard
     <span class="payroll-badge text-xs font-semibold px-2 py-1 rounded-full ml-3">
         <i class="fas fa-bolt mr-1"></i> Premium Plan
     </span>
@@ -38,7 +38,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-gray-500">Monthly Payroll</p>
-                    <p class="mt-1 text-3xl font-semibold text-gray-600">TZS {{ number_format($monthlyPayroll, 0) }}M</p>
+                    <p class="mt-1 text-3xl font-semibold text-gray-600">TZS <span class='text-green-500'>{{ number_format($monthlyPayroll, 0) }}</span></p>
                     <p class="mt-1 text-sm text-gray-500 flex items-center">
                         <span class="text-green-500 mr-1">
                             <i class="fas fa-arrow-up"></i>
@@ -113,12 +113,12 @@
                 <p class="text-sm text-gray-500 mt-1">Payroll summaries</p>
             </a>
 
-            <a href="#" class="card hover:shadow-md transition-all flex flex-col items-center text-center" onclick="openModal('submitComplianceModal')">
+            <a href="#" class="card hover:shadow-md transition-all flex flex-col items-center text-center" onclick="openModal('addComplianceModal')">
                 <div class="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center mb-4">
                     <i class="fas fa-shield-alt text-yellow-600 text-xl"></i>
                 </div>
-                <h4 class="font-medium text-gray-900">Compliance</h4>
-                <p class="text-sm text-gray-500 mt-1">Tax & statutory reports</p>
+                <h4 class="font-medium text-gray-900">Add Compliance Task</h4>
+                <p class="text-sm text-gray-500 mt-1">Tax & statutory tasks</p>
             </a>
         </div>
     </div>
@@ -147,7 +147,7 @@
             <div class="card h-full">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-lg font-medium text-gray-600">Recent Payslips</h3>
-                    <a href="#" class="text-sm text-green-600 hover:text-green-800">View All</a>
+                    <a href="{{ route('payroll') }}" class="text-sm text-green-600 hover:text-green-800">View All</a>
                 </div>
                 <div class="space-y-4">
                     @foreach($recentPayslips as $payslip)
@@ -158,8 +158,8 @@
                                 </div>
                             </div>
                             <div class="flex-1">
-                                <p class="font-medium">{{ $payslip->employee->name ?? 'N/A' }}</p>
-                                <p class="text-sm text-gray-500">{{ $payslip->employee->department ?? 'N/A' }}</p>
+                                <p class="font-medium">{{ optional($payslip->employee)->name ?? 'N/A' }}</p>
+                                <p class="text-sm text-gray-500">{{ optional($payslip->employee)->department ?? 'N/A' }}</p>
                             </div>
                             <div class="text-right">
                                 <p class="font-medium text-green-600">TZS {{ number_format($payslip->net_salary ?? 0) }}</p>
@@ -354,7 +354,7 @@
                             <label class="block text-gray-600 text-sm font-medium mb-2" for="employee_ids">Select Employees</label>
                             <select id="employee_ids" name="employee_ids[]" multiple class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
                                 @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name ?? 'N/A' }} ({{ $employee->employee_id ?? 'N/A' }})</option>
+                                    <option value="{{ $employee->id }}">{{ optional($employee)->name ?? 'N/A' }} ({{ $employee->employee_id ?? 'N/A' }})</option>
                                 @endforeach
                             </select>
                             <span class="text-red-500 text-sm hidden" id="employeeIdsError">At least one employee must be selected</span>
@@ -434,52 +434,68 @@
         </div>
     </div>
 
-    <!-- Submit Compliance Modal -->
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden" id="submitComplianceModal">
-        <div class="bg-white rounded-xl w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
+    <!-- Add Compliance Task Modal -->
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden" id="addComplianceModal">
+        <div class="bg-white rounded-xl w-full max-w-2xl modal-content">
             <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
                 <h3 class="text-xl font-semibold text-green-600 flex items-center">
-                    <i class="fas fa-shield-alt mr-2"></i> Submit Compliance
+                    <i class="fas fa-plus mr-2"></i> Add Compliance Task
                 </h3>
             </div>
             <div class="p-6">
-                <form id="submitComplianceForm" action="{{ route('compliance.submit') }}" method="POST">
+                <form id="addComplianceForm" action="{{ route('compliance.store') }}" method="POST">
                     @csrf
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="compliance_type">Compliance Type</label>
-                            <select id="compliance_type" name="compliance_type" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
+                        <div>
+                            <label for="compliance_type" class="block text-sm font-medium text-gray-700">Compliance Type</label>
+                            <select name="type" id="compliance_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                 <option value="PAYE">PAYE</option>
                                 <option value="NSSF">NSSF</option>
                                 <option value="NHIF">NHIF</option>
+                                <option value="WCF">WCF</option>
+                                <option value="SDL">SDL</option>
                             </select>
-                            <span class="text-red-500 text-sm hidden" id="complianceTypeError">Compliance Type is required</span>
+                            @error('type')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="due_date">Due Date</label>
-                            <input type="date" id="due_date" name="due_date" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
-                            <span class="text-red-500 text-sm hidden" id="dueDateError">Due Date is required</span>
+                        <div>
+                            <label for="employee_id" class="block text-sm font-medium text-gray-700">Employee (Optional)</label>
+                            <select name="employee_id" id="employee_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                                <option value="">None</option>
+                                @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ optional($employee)->name ?? 'N/A' }}</option>
+                                @endforeach
+                            </select>
+                            @error('employee_id')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="employee_id">Employee ID</label>
-                            <input type="text" id="employee_id" name="employee_id" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="EMP-001">
+                        <div>
+                            <label for="due_date" class="block text-sm font-medium text-gray-700">Due Date</label>
+                            <input type="date" name="due_date" id="due_date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                            @error('due_date')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="amount">Amount (TZS)</label>
-                            <input type="number" id="amount" name="amount" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="20000">
+                        <div>
+                            <label for="amount" class="block text-sm font-medium text-gray-700">Amount (Optional)</label>
+                            <input type="number" name="amount" id="amount" step="0.01" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm">
+                            @error('amount')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
-                        <div class="mb-4 col-span-2">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="details">Details</label>
-                            <textarea id="details" name="details" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter compliance details"></textarea>
+                        <div class="col-span-2">
+                            <label for="details" class="block text-sm font-medium text-gray-700">Details (Optional)</label>
+                            <textarea name="details" id="details" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"></textarea>
+                            @error('details')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
-                    <div class="flex justify-end space-x-3">
-                        <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200" onclick="closeModal('submitComplianceModal')">
-                            <i class="fas fa-times mr-2"></i> Cancel
-                        </button>
-                        <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200">
-                            <i class="fas fa-shield-alt mr-2"></i> Submit Compliance
-                        </button>
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button type="button" class="btn-primary bg-gray-500 hover:bg-gray-600" onclick="closeModal('addComplianceModal')">Cancel</button>
+                        <button type="submit" class="btn-primary">Create Task</button>
                     </div>
                 </form>
             </div>
@@ -632,7 +648,7 @@
             });
 
             // Form Validation
-            ['addEmployeeForm', 'editEmployeeForm', 'runPayrollForm', 'generateReportForm', 'submitComplianceForm'].forEach(formId => {
+            ['addEmployeeForm', 'editEmployeeForm', 'runPayrollForm', 'generateReportForm', 'addComplianceForm'].forEach(formId => {
                 const form = document.getElementById(formId);
                 if (form) {
                     form.addEventListener('submit', function(e) {

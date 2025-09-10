@@ -3,323 +3,468 @@
 @section('title', 'Payroll')
 
 @section('header-title')
-    Payroll Management
-    <span class="payroll-badge text-xs font-semibold px-2 py-1 rounded-full ml-3 bg-green-100 text-green-800">
-        <i class="fas fa-bolt mr-1"></i> Premium Plan
-    </span>
+    <div class="flex items-center space-x-3">
+        <span class="text-2xl font-bold text-gray-900">Payroll Management</span>
+        <span class="payroll-badge inline-flex items-center px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">
+            <i class="fas fa-bolt mr-1.5"></i> Premium Plan
+        </span>
+    </div>
 @endsection
 
 @section('header-subtitle')
-    Process and review payroll records for {{ $settings['company_name'] }}.
+    <span class="text-gray-600">Process and review payroll records for {{ $settings['company_name'] }}.</span>
 @endsection
 
 @section('content')
+    <!-- Success Message -->
+    @if(session('success'))
+    <div class="bg-green-50 border-l-4 border-green-400 text-green-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
+        <span class="block sm:inline">{{ session('success') }}</span>
+    </div>
+    @endif
+
     <!-- Quick Actions -->
-    <div>
+    <div class="mb-8">
         <h3 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
             <i class="fas fa-bolt text-yellow-500 mr-2"></i> Quick Actions
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <a href="#" class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300" onclick="openModal('runPayrollModal')">
-                <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mb-4">
-                    <i class="fas fa-calculator text-green-600 text-xl"></i>
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div class="bg-green-700 rounded-md border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('runPayrollModal')">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-calculator text-green-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-white">Run Payroll</div>
+                        <div class="text-sm text-white">Calculate and process employee salaries</div>
+                    </div>
                 </div>
-                <h4 class="font-semibold text-gray-900">Run Payroll</h4>
-                <p class="text-sm text-gray-500 mt-1">Process salary payments</p>
-            </a>
+            </div>
+            <div class="bg-blue-700 rounded-md border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('retroactivePayModal')">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-history text-blue-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-white">Retroactive Pay</div>
+                        <div class="text-sm text-white">Adjust payments for a past period</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-red-700 rounded-md border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('revertPayrollModal')">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-undo text-red-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-white">Revert Payroll</div>
+                        <div class="text-sm text-white">Undo the last payroll run</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-orange-700 rounded-md border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('transactionsModal')">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-exchange-alt text-orange-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900">Transactions</div>
+                        <div class="text-sm text-gray-500">View payroll transaction history</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Payroll History -->
-    <div class="mb-8">
-        <div class="flex justify-between items-center mb-4 flex-col sm:flex-row gap-4">
-            <h3 class="text-lg font-medium text-gray-700 flex items-center">
-                <i class="fas fa-file-invoice-dollar text-blue-500 mr-2"></i> Payroll History
-            </h3>
-            <div class="flex items-center space-x-4 w-full sm:w-auto">
-                <input type="text" id="searchPayroll" class="bg-white border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full sm:w-64 p-2.5 text-sm" placeholder="Search by Payroll ID or Period">
-                <select id="statusFilter" class="bg-white border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full sm:w-48 p-2.5 text-sm">
-                    <option value="">All Statuses</option>
-                    <option value="Paid">Paid</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Error">Error</option>
-                </select>
-                <button id="exportCsvButton" class="text-white bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200 flex items-center">
-                    <i class="fas fa-download mr-2"></i> Export to CSV
-                    <svg class="hidden w-4 h-4 ml-2 animate-spin text-white" id="exportSpinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 8v4a8 8 0 01-8-8z"></path>
-                    </svg>
-                </button>
+    <!-- Payroll History and Alerts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Payroll History Table -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="flex justify-between items-center px-6 pt-6 mb-4">
+                <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                    <i class="fas fa-bolt text-yellow-500 mr-2"></i> Payroll History
+                    <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $payrolls->total() }} records</span>
+                </h3>
             </div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
             <div class="overflow-x-auto">
-                <table class="w-full" id="payrollTable">
+                <table class="w-full">
                     <thead>
-                        <tr class="text-left text-gray-500 text-sm">
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="payroll_id">Payroll ID <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="period">Period <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="total_amount">Total Amount ({{ $settings['currency'] }}) <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="status">Status <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium">Actions</th>
+                        <tr class="bg-gray-50/80 border-b border-gray-200 text-gray-600 text-sm">
+                            <th class="py-3.5 px-6 text-left font-semibold">ID</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Period</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Total Amount</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Status</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        @forelse($payrolls as $payroll)
-                            <tr class="payroll-row" data-status="{{ $payroll->status }}">
-                                <td class="py-4">{{ $payroll->payroll_id }}</td>
-                                <td class="py-4">{{ $payroll->period }}</td>
-                                <td class="py-4">{{ number_format($payroll->total_amount, 2) }}</td>
-                                <td class="py-4">
-                                    <span class="status-badge {{ $payroll->status == 'Paid' ? 'status-paid' : ($payroll->status == 'Pending' ? 'status-pending' : 'status-error') }}">
-                                        {{ $payroll->status }}
-                                    </span>
-                                </td>
-                                <td class="py-4">
-                                    <button class="text-blue-600 text-sm font-medium hover:underline" onclick="viewPayroll('{{ $payroll->id }}')" title="View Details">View</button>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="py-4 text-center text-gray-500">No payroll records available</td>
-                            </tr>
-                        @endforelse
+                        @foreach($payrolls as $payroll)
+                        <tr class="bg-white hover:bg-gray-50/50 transition duration-150">
+                            <td class="py-4 px-6 text-sm text-gray-600 font-mono">{{ $payroll->payroll_id }}</td>
+                            <td class="py-4 px-6 text-sm text-gray-600">{{ \Carbon\Carbon::parse($payroll->payroll_period)->format('F Y') }}</td>
+                            <td class="py-4 px-6 text-sm text-gray-600 font-medium">TZS {{ number_format($payroll->total_amount, 2) }}</td>
+                            <td class="py-4 px-6 text-sm text-gray-600">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium payroll-status-{{ strtolower($payroll->status) }}">{{ $payroll->status }}</span>
+                            </td>
+                        </tr>
+                        @endforeach
                     </tbody>
                 </table>
+            </div>
+            <!-- Empty State -->
+            @if($payrolls->count() == 0)
+            <div class="text-center py-12">
+                <div class="mx-auto w-24 h-24 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                    <i class="fas fa-bolt text-gray-400 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-1">No payroll records found</h3>
+                <p class="text-gray-500 mb-6">Get started by running your first payroll.</p>
+                <button class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-200 font-medium rounded-md text-sm px-4 py-2 text-center transition-all duration-200 inline-flex items-center shadow-sm hover:shadow-md" onclick="openModal('runPayrollModal')">
+                    <i class="fas fa-calculator mr-2"></i> Run Payroll
+                </button>
+            </div>
+            @endif
+            <!-- Pagination -->
+            @if($payrolls->hasPages())
+            <div class="mt-6 flex items-center justify-between border-t border-gray-200 pt-5 px-6">
+                <div class="text-sm text-gray-700">
+                    Showing {{ $payrolls->firstItem() }} to {{ $payrolls->lastItem() }} of {{ $payrolls->total() }} results
+                </div>
+                <div class="flex space-x-2">
+                    @if($payrolls->onFirstPage())
+                    <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Previous</span>
+                    @else
+                    <a href="{{ $payrolls->previousPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Previous</a>
+                    @endif
+                    @if($payrolls->hasMorePages())
+                    <a href="{{ $payrolls->nextPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Next</a>
+                    @else
+                    <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Next</span>
+                    @endif
+                </div>
+            </div>
+            @endif
+        </div>
+
+        <!-- Payroll Alerts -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="flex justify-between items-center px-6 pt-6 mb-4">
+                <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i> Payroll Alerts
+                    <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $payroll_alerts->count() }} alerts</span>
+                </h3>
+            </div>
+            <div class="space-y-4 px-6 pb-6">
+                @if($payroll_alerts->isEmpty())
+                <div class="bg-gray-50 rounded-lg p-4 text-center text-gray-500">
+                    <i class="fas fa-check-circle text-green-500 mr-2"></i> No pending alerts.
+                </div>
+                @else
+                @foreach($payroll_alerts as $alert)
+                <div class="flex items-center p-4 rounded-lg bg-yellow-50 border border-yellow-200 shadow-sm">
+                    <div class="flex-shrink-0 text-yellow-500 mr-4">
+                        <i class="fas fa-exclamation-triangle text-xl"></i>
+                    </div>
+                    <div class="flex-grow">
+                        <p class="text-sm font-medium text-gray-800">{{ $alert->alert_type }} for {{ $alert->employee->name ?? 'N/A' }}</p>
+                        <p class="text-xs text-gray-500">{{ $alert->message }}</p>
+                    </div>
+                    <a href="#" class="text-white bg-yellow-500 hover:bg-yellow-600 focus:ring-4 focus:ring-yellow-200 font-medium rounded-md text-sm px-3 py-1.5 text-center transition-all duration-200 ml-4">
+                        <i class="fas fa-eye mr-1"></i> View
+                    </a>
+                </div>
+                @endforeach
+                @endif
             </div>
         </div>
     </div>
 
-    @section('modals')
-        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden" id="runPayrollModal">
-            <div class="bg-white rounded-xl w-full max-w-md">
-                <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
-                    <h3 class="text-xl font-semibold text-green-600 flex items-center">
+    <!-- Run Payroll Modal -->
+    <div id="runPayrollModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-labelledby="runPayrollModalTitle" aria-modal="true">
+        <div class="bg-white rounded-xl w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
+            <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-green-600 flex items-center" id="runPayrollModalTitle">
                         <i class="fas fa-calculator mr-2"></i> Run Payroll
                     </h3>
+                    <button type="button" onclick="closeModal('runPayrollModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition duration-150">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
-                <div class="p-6">
-                    <form id="runPayrollForm" action="{{ route('payroll.run') }}" method="POST">
-                        @csrf
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="payroll_period">Payroll Period</label>
-                            <input type="month" id="payroll_period" name="payroll_period" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
-                            <span class="text-red-500 text-sm mt-1 hidden" id="payrollPeriodError">Payroll Period is required</span>
+            </div>
+            <div class="p-6">
+                <form id="runPayrollForm" action="{{ route('payroll.run') }}" method="POST" class="space-y-4">
+                    @csrf
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="payroll_period" class="block text-gray-600 text-sm font-medium mb-2">Payroll Period</label>
+                            <input type="month" name="payroll_period" id="payroll_period" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5 sm:text-sm">
+                            <span class="text-red-500 text-sm hidden" id="payrollPeriodError">Payroll Period is required</span>
                             @error('payroll_period')
-                                <span class="text-red-500 text-sm mt-1">{{ $message }}</span>
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="employee_group">Employee Group</label>
-                            <select id="employee_group" name="employee_group" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                                <option value="">All Employees</option>
-                                @foreach($departments as $department)
-                                    <option value="{{ $department }}">{{ $department }}</option>
+                        <div>
+                            <label for="employees" class="block text-gray-600 text-sm font-medium mb-2">Select Employees</label>
+                            <select name="employee_ids[]" id="employees" multiple required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5 sm:text-sm">
+                                <option value="all">All Employees</option>
+                                @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->department }})</option>
                                 @endforeach
                             </select>
-                            @error('employee_group')
-                                <span class="text-red-500 text-sm mt-1">{{ $message }}</span>
+                            <span class="text-red-500 text-sm hidden" id="employeesError">At least one employee must be selected</span>
+                            @error('employee_ids')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="total_amount">Total Amount ({{ $settings['currency'] }})</label>
-                            <input type="number" id="total_amount" name="total_amount" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
-                            <span class="text-red-500 text-sm mt-1 hidden" id="totalAmountError">Total Amount is required</span>
-                            @error('total_amount')
-                                <span class="text-red-500 text-sm mt-1">{{ $message }}</span>
+                        <div>
+                            <label for="nssf_rate" class="block text-gray-600 text-sm font-medium mb-2">NSSF Rate (%)</label>
+                            <input type="number" step="0.01" name="nssf_rate" id="nssf_rate" required value="10" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5 sm:text-sm">
+                            <span class="text-red-500 text-sm hidden" id="nssfRateError">NSSF Rate is required</span>
+                            @error('nssf_rate')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="flex justify-end space-x-3">
-                            <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200" onclick="closeModal('runPayrollModal')">
-                                <i class="fas fa-times mr-2"></i> Cancel
-                            </button>
-                            <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200 flex items-center">
-                                <i class="fas fa-calculator mr-2"></i> Process Payroll
-                                <svg class="hidden w-4 h-4 ml-2 animate-spin text-white" id="formSpinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 8v4a8 8 0 01-8-8z"></path>
-                                </svg>
-                            </button>
+                        <div>
+                            <label for="nhif_rate" class="block text-gray-600 text-sm font-medium mb-2">NHIF Rate (%)</label>
+                            <input type="number" step="0.01" name="nhif_rate" id="nhif_rate" required value="6" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5 sm:text-sm">
+                            <span class="text-red-500 text-sm hidden" id="nhifRateError">NHIF Rate is required</span>
+                            @error('nhif_rate')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
-                    </form>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200" onclick="closeModal('runPayrollModal')">
+                            <i class="fas fa-times mr-2"></i> Cancel
+                        </button>
+                        <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200">
+                            <span id="formSpinner" class="hidden animate-spin h-4 w-4 mr-2 border-t-2 border-r-2 border-white rounded-full"></span>
+                            <i class="fas fa-calculator mr-2"></i> Run Payroll
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revert Payroll Modal -->
+    <div id="revertPayrollModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-labelledby="revertPayrollModalTitle" aria-modal="true">
+        <div class="bg-white rounded-xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content">
+            <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-red-600 flex items-center" id="revertPayrollModalTitle">
+                        <i class="fas fa-undo mr-2"></i> Revert Last Payroll
+                    </h3>
+                    <button type="button" onclick="closeModal('revertPayrollModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition duration-150">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-4">Are you sure you want to revert the last payroll run? This action cannot be undone and will delete all associated payslips and transactions.</p>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200" onclick="closeModal('revertPayrollModal')">
+                        <i class="fas fa-times mr-2"></i> Cancel
+                    </button>
+                    <button type="submit" form="revertPayrollForm" class="text-white bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200">
+                        <i class="fas fa-undo mr-2"></i> Revert Payroll
+                    </button>
                 </div>
             </div>
         </div>
-    @endsection
+        <form id="revertPayrollForm" action="{{ route('payroll.revert') }}" method="POST" class="hidden">
+            @csrf
+        </form>
+    </div>
 
-    <style>
-        .status-badge { @apply px-2 py-1 rounded-full text-xs font-medium; }
-        .status-paid { @apply bg-green-100 text-green-800; }
-        .status-pending { @apply bg-yellow-100 text-yellow-800; }
-        .status-error { @apply bg-red-100 text-red-800; }
-        th[data-sort] { @apply hover:text-green-600; }
-        th.sorted-asc i.fa-sort::before { content: "\f0dd"; }
-        th.sorted-desc i.fa-sort::before { content: "\f0de"; }
-    </style>
+    <!-- Retroactive Pay Modal -->
+    <div id="retroactivePayModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-labelledby="retroactivePayModalTitle" aria-modal="true">
+        <div class="bg-white rounded-xl w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
+            <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-blue-600 flex items-center" id="retroactivePayModalTitle">
+                        <i class="fas fa-history mr-2"></i> Retroactive Pay
+                    </h3>
+                    <button type="button" onclick="closeModal('retroactivePayModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition duration-150">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <form id="retroactivePayForm" action="{{ route('payroll.retro') }}" method="POST" class="space-y-4">
+                    @csrf
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="retro_period" class="block text-gray-600 text-sm font-medium mb-2">Retroactive Period</label>
+                            <input type="month" name="retro_period" id="retro_period" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 sm:text-sm">
+                            <span class="text-red-500 text-sm hidden" id="retroPeriodError">Retroactive Period is required</span>
+                            @error('retro_period')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="retro_employees" class="block text-gray-600 text-sm font-medium mb-2">Select Employees</label>
+                            <select name="employee_ids[]" id="retro_employees" multiple required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 sm:text-sm">
+                                <option value="all">All Employees</option>
+                                @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->department }})</option>
+                                @endforeach
+                            </select>
+                            <span class="text-red-500 text-sm hidden" id="retroEmployeesError">At least one employee must be selected</span>
+                            @error('employee_ids')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200" onclick="closeModal('retroactivePayModal')">
+                            <i class="fas fa-times mr-2"></i> Cancel
+                        </button>
+                        <button type="submit" class="text-white bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200">
+                            <i class="fas fa-history mr-2"></i> Process Retroactive Pay
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transactions Modal -->
+    <div id="transactionsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-labelledby="transactionsModalTitle" aria-modal="true">
+        <div class="bg-white rounded-xl w-full max-w-4xl transform transition-all duration-300 scale-95 modal-content">
+            <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-orange-600 flex items-center" id="transactionsModalTitle">
+                        <i class="fas fa-exchange-alt mr-2"></i> Payroll Transactions
+                    </h3>
+                    <button type="button" onclick="closeModal('transactionsModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition duration-150">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-50/80 border-b border-gray-200 text-gray-600 text-sm">
+                                    <th class="py-3.5 px-6 text-left font-semibold">Transaction ID</th>
+                                    <th class="py-3.5 px-6 text-left font-semibold">Employee</th>
+                                    <th class="py-3.5 px-6 text-left font-semibold">Amount</th>
+                                    <th class="py-3.5 px-6 text-left font-semibold">Date</th>
+                                    <th class="py-3.5 px-6 text-left font-semibold">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                @foreach($transactions as $transaction)
+                                <tr class="bg-white hover:bg-gray-50/50 transition duration-150">
+                                    <td class="py-4 px-6 text-sm text-gray-600 font-mono">{{ $transaction->id }}</td>
+                                    <td class="py-4 px-6 text-sm text-gray-600">{{ $transaction->employee->name ?? 'N/A' }}</td>
+                                    <td class="py-4 px-6 text-sm text-gray-600 font-medium">TZS {{ number_format($transaction->amount, 2) }}</td>
+                                    <td class="py-4 px-6 text-sm text-gray-600">{{ \Carbon\Carbon::parse($transaction->transaction_date)->format('F d, Y') }}</td>
+                                    <td class="py-4 px-6 text-sm text-gray-600">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ $transaction->status }}</span>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if($transactions->count() == 0)
+                    <div class="text-center py-12">
+                        <div class="mx-auto w-24 h-24 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                            <i class="fas fa-exchange-alt text-gray-400 text-2xl"></i>
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-900 mb-1">No transactions found</h3>
+                        <p class="text-gray-500 mb-6">Transaction history will appear here after running payroll.</p>
+                    </div>
+                    @endif
+                    @if($transactions->hasPages())
+                    <div class="mt-6 flex items-center justify-between border-t border-gray-200 pt-5 px-6">
+                        <div class="text-sm text-gray-700">
+                            Showing {{ $transactions->firstItem() }} to {{ $transactions->lastItem() }} of {{ $transactions->total() }} results
+                        </div>
+                        <div class="flex space-x-2">
+                            @if($transactions->onFirstPage())
+                            <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Previous</span>
+                            @else
+                            <a href="{{ $transactions->previousPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Previous</a>
+                            @endif
+                            @if($transactions->hasMorePages())
+                            <a href="{{ $transactions->nextPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Next</a>
+                            @else
+                            <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Next</span>
+                            @endif
+                        </div>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Modal functions
-            function openModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    setTimeout(() => {
-                        const modalContent = modal.querySelector('.modal-content') || modal;
-                        modalContent.classList.remove('scale-95');
-                        modalContent.classList.add('scale-100');
-                    }, 10);
-                }
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.querySelector('.modal-content').classList.add('scale-100');
+                modal.querySelector('.modal-content').classList.remove('scale-95');
             }
+        }
 
-            function closeModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    const modalContent = modal.querySelector('.modal-content') || modal;
-                    modalContent.classList.remove('scale-100');
-                    modalContent.classList.add('scale-95');
-                    setTimeout(() => {
-                        modal.classList.add('hidden');
-                    }, 300);
-                }
-            }
-
-            // Search and Filter with Debounce
-            let searchTimeout;
-            const searchInput = document.getElementById('searchPayroll');
-            const statusFilter = document.getElementById('statusFilter');
-            if (searchInput && statusFilter) {
-                searchInput.addEventListener('input', function() {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        const searchValue = this.value.toLowerCase();
-                        const statusValue = statusFilter.value;
-                        filterPayrollTable(searchValue, statusValue);
-                    }, 300);
-                });
-
-                statusFilter.addEventListener('change', function() {
-                    const searchValue = searchInput.value.toLowerCase();
-                    const statusValue = this.value;
-                    filterPayrollTable(searchValue, statusValue);
-                });
-            }
-
-            function filterPayrollTable(searchValue, statusFilter) {
-                const rows = document.querySelectorAll('#payrollTable .payroll-row');
-                rows.forEach(row => {
-                    const id = row.querySelector('td:first-child')?.textContent.toLowerCase() || '';
-                    const period = row.querySelector('td:nth-child(2)')?.textContent.toLowerCase() || '';
-                    const status = row.getAttribute('data-status') || '';
-                    const matchesSearch = id.includes(searchValue) || period.includes(searchValue);
-                    const matchesStatus = !statusFilter || status === statusFilter;
-                    row.style.display = matchesSearch && matchesStatus ? '' : 'none';
-                });
-            }
-
-            // Table Sorting
-            let sortDirection = {};
-            document.querySelectorAll('th[data-sort]').forEach(header => {
-                header.addEventListener('click', function() {
-                    const sortKey = this.getAttribute('data-sort');
-                    sortDirection[sortKey] = !sortDirection[sortKey] ? 'asc' : sortDirection[sortKey] === 'asc' ? 'desc' : 'asc';
-                    document.querySelectorAll('th[data-sort]').forEach(th => {
-                        th.classList.remove('sorted-asc', 'sorted-desc');
-                        th.querySelector('i.fa-sort').className = 'fas fa-sort ml-1';
-                    });
-                    this.classList.add(`sorted-${sortDirection[sortKey]}`);
-                    sortTable(sortKey, sortDirection[sortKey]);
-                });
-            });
-
-            function sortTable(key, direction) {
-                const tbody = document.querySelector('#payrollTable tbody');
-                const rows = Array.from(tbody.querySelectorAll('.payroll-row'));
-                rows.sort((a, b) => {
-                    let aValue = a.querySelector(`td:nth-child(${key === 'payroll_id' ? 1 : key === 'period' ? 2 : key === 'total_amount' ? 3 : 4})`)?.textContent || '';
-                    let bValue = b.querySelector(`td:nth-child(${key === 'payroll_id' ? 1 : key === 'period' ? 2 : key === 'total_amount' ? 3 : 4})`)?.textContent || '';
-                    if (key === 'total_amount') {
-                        aValue = parseFloat(aValue.replace(/[^0-9.-]+/g, '')) || 0;
-                        bValue = parseFloat(bValue.replace(/[^0-9.-]+/g, '')) || 0;
-                    }
-                    return direction === 'asc' ? aValue.localeCompare(bValue, undefined, {numeric: true}) : bValue.localeCompare(aValue, undefined, {numeric: true});
-                });
-                tbody.innerHTML = '';
-                rows.forEach(row => tbody.appendChild(row));
-            }
-
-            // Export to CSV
-            document.getElementById('exportCsvButton').addEventListener('click', function() {
-                const button = this;
-                const spinner = document.getElementById('exportSpinner');
-                button.disabled = true;
-                spinner.classList.remove('hidden');
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.querySelector('.modal-content').classList.add('scale-95');
+                modal.querySelector('.modal-content').classList.remove('scale-100');
                 setTimeout(() => {
-                    try {
-                        const payrolls = JSON.parse('{{ $payrolls->map(function($payroll) {
-                            return [
-                                "payroll_id" => $payroll->payroll_id,
-                                "period" => $payroll->period,
-                                "total_amount" => number_format($payroll->total_amount, 2),
-                                "status" => $payroll->status
-                            ];
-                        })->toJson() }}');
-                        const headers = ['Payroll ID', 'Period', 'Total Amount ({{ $settings['currency'] }})', 'Status'];
-                        const csvRows = [headers.join(',')];
-                        payrolls.forEach(payroll => {
-                            const row = [
-                                payroll.payroll_id || '',
-                                payroll.period || '',
-                                payroll.total_amount || 0,
-                                payroll.status || ''
-                            ];
-                            csvRows.push(row.join(','));
+                    modal.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            ['runPayrollForm', 'retroactivePayForm'].forEach(formId => {
+                const form = document.getElementById(formId);
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        let valid = true;
+                        form.querySelectorAll('[required]').forEach(input => {
+                            const errorElement = document.getElementById(`${input.id}Error`);
+                            if (!input.value.trim()) {
+                                valid = false;
+                                if (errorElement) errorElement.classList.remove('hidden');
+                            } else {
+                                if (errorElement) errorElement.classList.add('hidden');
+                            }
                         });
-                        const csvContent = csvRows.join('\n');
-                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = 'payrolls.csv';
-                        link.click();
-                        URL.revokeObjectURL(link.href);
-                    } catch (e) {
-                        console.error('Error exporting CSV:', e);
-                        alert('Failed to export CSV. Please try again.');
-                    } finally {
-                        button.disabled = false;
-                        spinner.classList.add('hidden');
-                    }
-                }, 500);
+                        if (!valid) {
+                            e.preventDefault();
+                            return;
+                        }
+                        const submitButton = form.querySelector('button[type="submit"]');
+                        const spinner = document.getElementById('formSpinner');
+                        submitButton.disabled = true;
+                        if (spinner) spinner.classList.remove('hidden');
+                    });
+                }
             });
 
-            // Form Validation
-            const form = document.getElementById('runPayrollForm');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    let valid = true;
-                    const spinner = document.getElementById('formSpinner');
-                    form.querySelectorAll('[required]').forEach(input => {
-                        const errorElement = document.getElementById(`${input.id}Error`);
-                        if (!input.value.trim()) {
-                            valid = false;
-                            if (errorElement) errorElement.classList.remove('hidden');
-                        } else {
-                            if (errorElement) errorElement.classList.add('hidden');
-                        }
-                    });
-                    if (!valid) {
-                        e.preventDefault();
-                    } else {
-                        e.preventDefault();
-                        const submitButton = form.querySelector('button[type="submit"]');
-                        submitButton.disabled = true;
-                        spinner.classList.remove('hidden');
-                        setTimeout(() => {
-                            form.submit();
-                        }, 500);
-                    }
+            const revertPayrollForm = document.getElementById('revertPayrollForm');
+            if (revertPayrollForm) {
+                revertPayrollForm.addEventListener('submit', function(e) {
+                    const submitButton = revertPayrollForm.querySelector('button[type="submit"]');
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Reverting...';
                 });
             }
         });

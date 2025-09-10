@@ -1,68 +1,106 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\LoginController;
-use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\PayrollController;
-use App\Http\Controllers\ComplianceController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ComplianceController;
+use App\Http\Controllers\LoginController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
+use App\Http\Controllers\ResetPasswordController;
+use App\Http\Controllers\EmployeePortalController;
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\RoleController;
+use Illuminate\Support\Facades\Route;
 
-//Authentication Route
+/*
+|--------------------------------------------------------------------------
+| Authentication Routes
+|--------------------------------------------------------------------------
+| Hizi ni routes za kuingia na kutoka kwenye mfumo. Hazihitaji middleware maalum
+| kwa sababu mtumiaji anahitaji kupata routes hizi bila ruhusa.
+|
+*/
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
+Route::post('/', [LoginController::class, 'login']);
+Route::post('logout', [LoginController::class, 'logout'])->name('logout');
 
-//Registration Route
-Route::get('/register', [RegisterController::class, 'showRegisterForm'])->name('register');
+/*
+|--------------------------------------------------------------------------
+| Password Reset Routes
+|--------------------------------------------------------------------------
+| Hizi ni routes zinazohusika na kuweka upya nenosiri. Hazihitaji middleware
+| kwa kuwa mtumiaji lazima aweze kuzifikia hata kama hajaingia kwenye mfumo.
+|
+*/
+Route::get('password/reset', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
+Route::post('password/email', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email');
+Route::get('password/reset/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
+Route::post('password/reset', [ResetPasswordController::class, 'reset'])->name('password.update');
 
+/*
+|--------------------------------------------------------------------------
+| Admin / HR Dashboard Routes
+|--------------------------------------------------------------------------
+| Hizi ni routes kwa ajili ya Admin na HR. Zimefungwa na middleware ya 'auth'
+| ili kuhakikisha kuwa ni watumiaji waliothibitishwa pekee wanaozipata.
+|
+*/
+Route::prefix('dashboard')->middleware(['auth'])->group(function () {
+    // Dashboard home
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    // Employee Management
+    Route::resource('employees', EmployeeController::class);
+    Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.bulk-import');
 
-    Route::prefix('dashboard')->group(function () {
-        // Employee Routes
-        Route::get('/employee', [EmployeeController::class, 'index'])->name('employees');
-        Route::post('/employee', [EmployeeController::class, 'store'])->name('employees.store');
-        Route::get('/employee/{id}', [EmployeeController::class, 'show'])->name('employees.show');
-        Route::get('/employee/{id}/edit', [EmployeeController::class, 'edit'])->name('employees.edit');
-        Route::put('/employee/{id}', [EmployeeController::class, 'update'])->name('employees.update');
-        Route::post('/employee/import', [EmployeeController::class, 'import'])->name('employees.import');
+    // Payroll
+    Route::get('/payroll', [PayrollController::class, 'index'])->name('payroll');
+    Route::post('/payroll/run', [PayrollController::class, 'run'])->name('payroll.run');
+    Route::post('/payroll/revert', [PayrollController::class, 'revert'])->name('payroll.revert');
+    Route::post('/payroll/retro', [PayrollController::class, 'retro'])->name('payroll.retro');
+    Route::post('/payroll/paycheck', [PayrollController::class, 'paycheck'])->name('payroll.paycheck');
+    Route::get('/payroll/transactions', [PayrollController::class, 'transactions'])->name('payroll.transactions');
 
-        // Payroll Routes
-        Route::get('/payroll', [PayrollController::class, 'index'])->name('payroll');
-        Route::post('/payroll/run', [PayrollController::class, 'run'])->name('payroll.run');
-        Route::post('/payroll/retro', [PayrollController::class, 'retro'])->name('payroll.retro');
-        Route::post('/payroll/paycheck', [PayrollController::class, 'paycheck'])->name('payroll.paycheck');
-        Route::get('/payroll/transactions', [PayrollController::class, 'transactions'])->name('payroll.transactions');
+    // Reports
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports');
+    Route::post('/reports/generate', [ReportController::class, 'generate'])->name('reports.generate');
+    Route::get('/reports/{id}/download', [ReportController::class, 'download'])->name('reports.download');
+    Route::delete('/reports/{id}', [ReportController::class, 'destroy'])->name('reports.destroy');
 
-        // Report Routes
-        Route::get('/report', [ReportController::class, 'index'])->name('reports');
-        Route::post('/report/generate', [ReportController::class, 'generate'])->name('reports.generate');
-        Route::get('/report/{id}/{format}', [ReportController::class, 'download'])->name('reports.download');
-        Route::post('/report/tax-forms', [ReportController::class, 'taxForms'])->name('reports.tax_forms');
+    // Compliance
+    Route::resource('compliance', ComplianceController::class);
+    Route::post('/compliance/{task}/submit', [ComplianceController::class, 'submit'])->name('compliance.submit');
 
-        // Compliance Routes
-        Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance');
-        Route::post('/compliance', [ComplianceController::class, 'store'])->name('compliance.store');
-        Route::get('/compliance/{id}/edit', [ComplianceController::class, 'edit'])->name('compliance.edit');
-        Route::put('/compliance/{id}', [ComplianceController::class, 'update'])->name('compliance.update');
+    // Attendance (Admin/HR)
+    Route::get('/attendance', [AttendanceController::class, 'index'])->name('dashboard.attendance');
+    Route::post('/attendance/store', [AttendanceController::class, 'store'])->name('attendance.store');
+    Route::post('/attendance/export', [AttendanceController::class, 'export'])->name('attendance.export');
 
-        // Settings Routes
-        Route::get('/setting', [SettingController::class, 'index'])->name('settings');
-        Route::post('/setting', [SettingController::class, 'update'])->name('settings.update');
+    // Settings
+    Route::get('/settings', [SettingController::class, 'index'])->name('settings');
+    Route::post('/settings/update', [SettingController::class, 'update'])->name('settings.update');
 
-        // Attendance Routes
-        Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance');
-        Route::post('/attendance', [AttendanceController::class, 'store'])->name('attendance.store');
-        Route::get('/attendance/{id}/edit', [AttendanceController::class, 'edit'])->name('attendance.edit');
-        Route::put('/attendance/{id}', [AttendanceController::class, 'update'])->name('attendance.update');
-        Route::post('/attendance/leave', [AttendanceController::class, 'requestLeave'])->name('leave.request');
-        Route::post('/attendance/export', [AttendanceController::class, 'export'])->name('attendance.export');
+    // Roles
+    Route::resource('roles', RoleController::class);
+});
 
-        // Employee Portal Routes
-        Route::get('/employee-portal', [EmployeePortalController::class, 'index'])->name('employee.portal');
-        Route::put('/employee-portal', [EmployeePortalController::class, 'update'])->name('employee.update');
-        Route::get('/payslip/{id}/download', [EmployeePortalController::class, 'downloadPayslip'])->name('payslip.download');
-         });
+/*
+|--------------------------------------------------------------------------
+| Employee Portal Routes
+|--------------------------------------------------------------------------
+| Hizi ni routes kwa ajili ya wafanyakazi. Zimefungwa na middleware ya 'auth'
+| ili kuhakikisha kuwa ni wafanyakazi waliothibitishwa pekee wanaozipata.
+|
+*/
+Route::prefix('portal')->middleware(['auth'])->group(function () {
+    // Employee Portal Home
+    Route::get('/', [EmployeePortalController::class, 'index'])->name('employee.portal');
+
+    // Employee Portal actions
+    Route::post('/update', [EmployeePortalController::class, 'update'])->name('employee.portal.update');
+    Route::get('/payslips/{id}/download', [EmployeePortalController::class, 'downloadPayslip'])->name('employee.payslip.download');
+    Route::get('/attendance', [AttendanceController::class, 'index'])->name('portal.attendance');
+    Route::post('/leave/request', [AttendanceController::class, 'requestLeave'])->name('leave.request');
 });

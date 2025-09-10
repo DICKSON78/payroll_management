@@ -11,7 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Hapa tunasajili 'aliases' za middleware kwa ajili ya matumizi rahisi kwenye faili za 'routes'.
+        $middleware->alias([
+            'checkrole' => \App\Http\Middleware\CheckRole::class, 
+            'employee' => \App\Http\Middleware\EmployeeMiddleware::class,
+            'admin.hr' => \App\Http\Middleware\AdminHRMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

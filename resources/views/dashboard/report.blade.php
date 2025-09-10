@@ -3,168 +3,251 @@
 @section('title', 'Reports')
 
 @section('header-title')
-    Reports
-    <span class="payroll-badge text-xs font-semibold px-2 py-1 rounded-full ml-3 bg-green-100 text-green-800">
-        <i class="fas fa-bolt mr-1"></i> Premium Plan
-    </span>
+    <div class="flex items-center space-x-3">
+        <span class="text-2xl font-bold text-gray-900">Reports</span>
+        <span class="payroll-badge inline-flex items-center px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">
+            <i class="fas fa-bolt mr-1.5"></i> Premium Plan
+        </span>
+    </div>
 @endsection
 
 @section('header-subtitle')
-    {{-- Generate and view payroll and compliance reports for {{ $settings['company_name'] }}. --}}
+    <span class="text-gray-600">Generate and view payroll and compliance reports for {{ $settings['company_name'] }}.</span>
 @endsection
 
 @section('content')
+    <!-- Success Message -->
+    @if(session('success'))
+    <div class="bg-green-50 border-l-4 border-green-400 text-green-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
+        <span class="block sm:inline">{{ session('success') }}</span>
+    </div>
+    @endif
+
     <!-- Quick Actions -->
-    <div>
+    <div class="mb-8">
         <h3 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
             <i class="fas fa-bolt text-yellow-500 mr-2"></i> Quick Actions
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <a href="#" class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300" onclick="openModal('generateReportModal')">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300 cursor-pointer" onclick="openModal('generateReportModal')">
                 <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4">
                     <i class="fas fa-file-pdf text-purple-600 text-xl"></i>
                 </div>
                 <h4 class="font-semibold text-gray-900">Generate Report</h4>
-                <p class="text-sm text-gray-500 mt-1">Create payroll or compliance reports</p>
+                <p class="text-sm text-gray-500 mt-1">Create new payroll or tax reports.</p>
+            </div>
+            <a href="{{ route('reports') }}" class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300">
+                <div class="w-12 h-12 rounded-lg bg-pink-100 flex items-center justify-center mb-4">
+                    <i class="fas fa-list text-pink-600 text-xl"></i>
+                </div>
+                <h4 class="font-semibold text-gray-900">View Reports</h4>
+                <p class="text-sm text-gray-500 mt-1">Review all generated reports.</p>
             </a>
+            <div class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300 cursor-pointer" onclick="alert('This feature is coming soon!')">
+                <div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center mb-4">
+                    <i class="fas fa-chart-line text-orange-600 text-xl"></i>
+                </div>
+                <h4 class="font-semibold text-gray-900">Analytics</h4>
+                <p class="text-sm text-gray-500 mt-1">Analyze payroll trends and insights.</p>
+            </div>
+            <div class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300 cursor-pointer" onclick="alert('This feature is coming soon!')">
+                <div class="w-12 h-12 rounded-lg bg-teal-100 flex items-center justify-center mb-4">
+                    <i class="fas fa-cogs text-teal-600 text-xl"></i>
+                </div>
+                <h4 class="font-semibold text-gray-900">Settings</h4>
+                <p class="text-sm text-gray-500 mt-1">Configure report generation settings.</p>
+            </div>
         </div>
     </div>
 
-    <!-- Reports List -->
-    <div class="mb-8">
-        <div class="flex justify-between items-center mb-4 flex-col sm:flex-row gap-4">
+    <!-- Search Input -->
+    <div class="mb-6 relative">
+        <div class="relative max-w-md">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.65a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <input id="searchReport" type="text" placeholder="Search by report ID or employee..." class="pl-10 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500 transition duration-150 bg-white shadow-sm text-gray-900 placeholder-gray-500">
+        </div>
+    </div>
+
+    <!-- Recent Reports Table -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="flex justify-between items-center px-6 pt-6 mb-4">
             <h3 class="text-lg font-medium text-gray-700 flex items-center">
-                <i class="fas fa-file-alt text-blue-500 mr-2"></i> Generated Reports
+                <i class="fas fa-file-alt text-green-500 mr-2"></i> Recent Reports
+                <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $reports->total() }} reports</span>
             </h3>
-            <div class="flex items-center space-x-4 w-full sm:w-auto">
-                <input type="text" id="searchReport" class="bg-white border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full sm:w-64 p-2.5 text-sm" placeholder="Search by Report ID, Type, or Employee">
-                <select id="reportTypeFilter" class="bg-white border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full sm:w-48 p-2.5 text-sm">
-                    <option value="">All Report Types</option>
-                    <option value="payslip">Payslip</option>
-                    <option value="payroll_summary">Payroll Summary</option>
-                    <option value="tax_report">Tax Report</option>
-                    <option value="nssf_report">NSSF Report</option>
-                    <option value="nhif_report">NHIF Report</option>
-                    <option value="year_end_summary">Year-End Summary</option>
-                </select>
-                <button id="exportCsvButton" class="text-white bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200 flex items-center">
-                    <i class="fas fa-download mr-2"></i> Export to CSV
-                    <svg class="hidden w-4 h-4 ml-2 animate-spin text-white" id="exportSpinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 8v4a8 8 0 01-8-8z"></path>
-                    </svg>
-                </button>
-            </div>
         </div>
-
-        <div class="bg-white rounded-xl shadow-sm p-6">
-            <div class="overflow-x-auto">
-                <table class="w-full" id="reportsTable">
-                    <thead>
-                        <tr class="text-left text-gray-500 text-sm">
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="report_id">Report ID <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="type">Type <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="employee">Employee <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="period">Period <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium cursor-pointer" data-sort="generated_at">Generated At <i class="fas fa-sort ml-1"></i></th>
-                            <th class="pb-3 font-medium">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @forelse($reports as $report)
-                            <tr class="report-row" data-type="{{ $report->type }}">
-                                <td class="py-4">{{ $report->report_id }}</td>
-                                <td class="py-4">{{ str_replace('_', ' ', ucfirst($report->type)) }}</td>
-                                <td class="py-4">{{ $report->employee ? $report->employee->name . ' (' . $report->employee->employee_id . ')' : 'All Employees' }}</td>
-                                <td class="py-4">{{ $report->period }}</td>
-                                <td class="py-4">{{ $report->created_at->format('d/m/Y H:i') }}</td>
-                                <td class="py-4 flex space-x-2">
-                                    <a href="{{ route('reports.download', [$report->id, 'pdf']) }}" class="text-blue-600 text-sm font-medium hover:underline" title="Download PDF">PDF</a>
-                                    <a href="{{ route('reports.download', [$report->id, 'excel']) }}" class="text-blue-600 text-sm font-medium hover:underline" title="Download Excel">Excel</a>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="py-4 text-center text-gray-500">No reports available</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-gray-50/80 border-b border-gray-200 text-gray-600 text-sm">
+                        <th class="py-3.5 px-6 text-left font-semibold">Report ID</th>
+                        <th class="py-3.5 px-6 text-left font-semibold">Type</th>
+                        <th class="py-3.5 px-6 text-left font-semibold">Period</th>
+                        <th class="py-3.5 px-6 text-left font-semibold">Employee</th>
+                        <th class="py-3.5 px-6 text-left font-semibold">Format</th>
+                        <th class="py-3.5 px-6 text-left font-semibold">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="reportsTable" class="divide-y divide-gray-100">
+                    @foreach($reports as $report)
+                    @php
+                        $formatColors = [
+                            'pdf' => 'bg-purple-100 text-purple-800',
+                            'excel' => 'bg-green-100 text-green-800'
+                        ];
+                        $formatColor = $formatColors[strtolower($report->export_format)] ?? 'bg-gray-100 text-gray-800';
+                    @endphp
+                    <tr id="report-{{ $report->id }}" class="bg-white hover:bg-gray-50/50 transition duration-150 report-row" data-report-id="{{ strtolower($report->report_id) }}" data-employee="{{ strtolower($report->employee->name ?? 'all') }}">
+                        <td class="py-4 px-6 text-sm text-gray-900 font-mono">{{ $report->report_id }}</td>
+                        <td class="py-4 px-6 text-sm text-gray-700">{{ ucwords(str_replace('_', ' ', $report->type)) }}</td>
+                        <td class="py-4 px-6 text-sm text-gray-900">{{ $report->period }}</td>
+                        <td class="py-4 px-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                    <span class="font-medium text-green-800">{{ $report->employee ? substr($report->employee->name, 0, 1) : 'A' }}</span>
+                                </div>
+                                <div>
+                                    <div class="font-medium text-gray-900">{{ $report->employee->name ?? 'All' }}</div>
+                                    <div class="text-sm text-gray-500">{{ $report->employee->email ?? 'N/A' }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-4 px-6">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $formatColor }}">
+                                <span class="w-2 h-2 bg-{{ strtolower($report->export_format) == 'pdf' ? 'purple' : 'green' }}-500 rounded-full mr-1.5"></span>
+                                {{ strtoupper($report->export_format) }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-6">
+                            <div class="flex items-center space-x-2">
+                                <a href="{{ route('reports.download', ['id' => $report->id]) }}" class="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition duration-150" title="Download">
+                                    <i class="fas fa-download text-sm"></i>
+                                </a>
+                                <form action="{{ route('reports.destroy', ['id' => $report->id]) }}" method="POST" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this report?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition duration-150" title="Delete">
+                                        <i class="fas fa-trash text-sm"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <!-- Empty State -->
+        @if($reports->count() == 0)
+        <div class="text-center py-12">
+            <div class="mx-auto w-24 h-24 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <i class="fas fa-file-alt text-gray-400 text-2xl"></i>
             </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-1">No reports found</h3>
+            <p class="text-gray-500 mb-6">Get started by generating your first report.</p>
+            <button class="text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 font-medium rounded-md text-sm px-4 py-2 text-center transition-all duration-200 inline-flex items-center shadow-sm hover:shadow-md" onclick="openModal('generateReportModal')">
+                <i class="fas fa-file-pdf mr-2"></i> Generate Report
+            </button>
+        </div>
+        @endif
+    </div>
+
+    <!-- Pagination -->
+    @if($reports->hasPages())
+    <div class="mt-6 flex items-center justify-between border-t border-gray-200 pt-5">
+        <div class="text-sm text-gray-700">
+            Showing {{ $reports->firstItem() }} to {{ $reports->lastItem() }} of {{ $reports->total() }} results
+        </div>
+        <div class="flex space-x-2">
+            @if($reports->onFirstPage())
+            <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Previous</span>
+            @else
+            <a href="{{ $reports->previousPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Previous</a>
+            @endif
+            @if($reports->hasMorePages())
+            <a href="{{ $reports->nextPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Next</a>
+            @else
+            <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Next</span>
+            @endif
         </div>
     </div>
+    @endif
 
     <!-- Generate Report Modal -->
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden" id="generateReportModal">
-        <div class="bg-white rounded-xl w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
+    <div id="generateReportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-labelledby="generateReportModalTitle" aria-modal="true">
+        <div class="bg-white rounded-xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content">
             <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
-                <h3 class="text-xl font-semibold text-green-600 flex items-center">
-                    <i class="fas fa-file-pdf mr-2"></i> Generate Report
-                </h3>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-green-600 flex items-center" id="generateReportModalTitle">
+                        <i class="fas fa-file-pdf mr-2"></i> Generate Report
+                    </h3>
+                    <button type="button" onclick="closeModal('generateReportModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition duration-150">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="p-6">
-                <form id="generateReportForm" action="{{ route('reports.generate') }}" method="POST">
+                <form id="generateReportForm" action="{{ route('reports.generate') }}" method="POST" class="space-y-4">
                     @csrf
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="report_type">Report Type</label>
-                            <select id="report_type" name="report_type" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
-                                <option value="">Select Report Type</option>
-                                <option value="payslip">Payslip</option>
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label for="report_type" class="block text-gray-600 text-sm font-medium mb-2">Report Type</label>
+                            <select name="report_type" id="report_type" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
+                                <option value="">Select a report type</option>
                                 <option value="payroll_summary">Payroll Summary</option>
                                 <option value="tax_report">Tax Report</option>
-                                <option value="nssf_report">NSSF Report</option>
-                                <option value="nhif_report">NHIF Report</option>
-                                <option value="year_end_summary">Year-End Summary</option>
+                                <option value="payslip">Payslip</option>
                             </select>
-                            <span class="text-red-500 text-sm mt-1 hidden" id="reportTypeError">Report Type is required</span>
+                            <span class="text-red-500 text-sm hidden" id="reportTypeError">Report Type is required</span>
                             @error('report_type')
-                                <span class="text-red-500 text-sm mt-1">{{ $message }}</span>
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="report_period">Report Period</label>
-                            <input type="month" id="report_period" name="report_period" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
-                            <span class="text-red-500 text-sm mt-1 hidden" id="reportPeriodError">Report Period is required</span>
+                        <div>
+                            <label for="report_period" class="block text-gray-600 text-sm font-medium mb-2">Report Period</label>
+                            <input type="month" name="report_period" id="report_period" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
+                            <span class="text-red-500 text-sm hidden" id="reportPeriodError">Report Period is required</span>
                             @error('report_period')
-                                <span class="text-red-500 text-sm mt-1">{{ $message }}</span>
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="employee_id">Employee (Optional)</label>
-                            <select id="employee_id" name="employee_id" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
+                        <div>
+                            <label for="employee_id" class="block text-gray-600 text-sm font-medium mb-2">Specific Employee (Optional)</label>
+                            <select name="employee_id" id="employee_id" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
                                 <option value="">All Employees</option>
                                 @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->employee_id }})</option>
+                                <option value="{{ $employee->id }}">{{ $employee->name }}</option>
                                 @endforeach
                             </select>
                             @error('employee_id')
-                                <span class="text-red-500 text-sm mt-1">{{ $message }}</span>
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
-                        <div class="mb-4">
-                            <label class="block text-gray-600 text-sm font-medium mb-2" for="export_format">Export Format</label>
-                            <select id="export_format" name="export_format" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required>
-                                <option value="">Select Export Format</option>
+                        <div>
+                            <label for="export_format" class="block text-gray-600 text-sm font-medium mb-2">Export Format</label>
+                            <select name="export_format" id="export_format" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
                                 <option value="pdf">PDF</option>
                                 <option value="excel">Excel</option>
                             </select>
-                            <span class="text-red-500 text-sm mt-1 hidden" id="exportFormatError">Export Format is required</span>
+                            <span class="text-red-500 text-sm hidden" id="exportFormatError">Export Format is required</span>
                             @error('export_format')
-                                <span class="text-red-500 text-sm mt-1">{{ $message }}</span>
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
                     </div>
-                    <div class="flex justify-end space-x-3">
+                    <div class="flex justify-end space-x-3 mt-4">
                         <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200" onclick="closeModal('generateReportModal')">
                             <i class="fas fa-times mr-2"></i> Cancel
                         </button>
-                        <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200 flex items-center">
-                            <i class="fas fa-file-export mr-2"></i> Generate Report
-                            <svg class="hidden w-4 h-4 ml-2 animate-spin text-white" id="formSpinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 8v4a8 8 0 01-8-8z"></path>
-                            </svg>
+                        <button type="submit" class="text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200">
+                            <span id="formSpinner" class="hidden animate-spin h-4 w-4 mr-2 border-t-2 border-r-2 border-white rounded-full"></span>
+                            <i class="fas fa-file-pdf mr-2"></i> Generate Report
                         </button>
                     </div>
                 </form>
@@ -172,167 +255,38 @@
         </div>
     </div>
 
-    <style>
-        .status-badge {
-            @apply px-2 py-1 rounded-full text-xs font-medium;
-        }
-        .status-paid { @apply bg-green-100 text-green-800; }
-        .status-pending { @apply bg-yellow-100 text-yellow-800; }
-        .status-error { @apply bg-red-100 text-red-800; }
-        th[data-sort] { @apply hover:text-green-600; }
-        th.sorted-asc i.fa-sort::before { content: "\f0dd"; }
-        th.sorted-desc i.fa-sort::before { content: "\f0de"; }
-    </style>
-
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Modal functions
-            function openModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    modal.classList.remove('hidden');
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+                const modalContent = modal.querySelector('.modal-content');
+                if (modalContent) {
+                    modalContent.classList.remove('scale-95');
+                    modalContent.classList.add('scale-100');
+                }
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                const modalContent = modal.querySelector('.modal-content');
+                if (modalContent) {
+                    modalContent.classList.remove('scale-100');
+                    modalContent.classList.add('scale-95');
                     setTimeout(() => {
-                        const modalContent = modal.querySelector('.modal-content');
-                        if (modalContent) {
-                            modalContent.classList.remove('scale-95');
-                            modalContent.classList.add('scale-100');
-                        }
-                    }, 10);
-                }
-            }
-
-            function closeModal(modalId) {
-                const modal = document.getElementById(modalId);
-                if (modal) {
-                    const modalContent = modal.querySelector('.modal-content');
-                    if (modalContent) {
-                        modalContent.classList.remove('scale-100');
-                        modalContent.classList.add('scale-95');
-                        setTimeout(() => {
-                            modal.classList.add('hidden');
-                        }, 300);
-                    }
-                }
-            }
-
-            // Search and Filter with Debounce
-            let searchTimeout;
-            const searchInput = document.getElementById('searchReport');
-            const typeFilter = document.getElementById('reportTypeFilter');
-            if (searchInput && typeFilter) {
-                searchInput.addEventListener('input', function() {
-                    clearTimeout(searchTimeout);
-                    searchTimeout = setTimeout(() => {
-                        const searchValue = this.value.toLowerCase();
-                        const typeValue = typeFilter.value;
-                        filterReportsTable(searchValue, typeValue);
+                        modal.classList.add('hidden');
                     }, 300);
-                });
-
-                typeFilter.addEventListener('change', function() {
-                    const searchValue = searchInput.value.toLowerCase();
-                    const typeValue = this.value;
-                    filterReportsTable(searchValue, typeValue);
-                });
+                }
             }
+        }
 
-            function filterReportsTable(searchValue, typeFilter) {
-                const rows = document.querySelectorAll('#reportsTable .report-row');
-                rows.forEach(row => {
-                    const id = row.querySelector('td:first-child')?.textContent.toLowerCase() || '';
-                    const type = row.querySelector('td:nth-child(2)')?.textContent.toLowerCase() || '';
-                    const employee = row.querySelector('td:nth-child(3)')?.textContent.toLowerCase() || '';
-                    const period = row.querySelector('td:nth-child(4)')?.textContent.toLowerCase() || '';
-                    const matchesSearch = id.includes(searchValue) || type.includes(searchValue) || employee.includes(searchValue) || period.includes(searchValue);
-                    const matchesType = !typeFilter || row.getAttribute('data-type') === typeFilter;
-                    row.style.display = matchesSearch && matchesType ? '' : 'none';
-                });
-            }
-
-            // Table Sorting
-            let sortDirection = {};
-            document.querySelectorAll('th[data-sort]').forEach(header => {
-                header.addEventListener('click', function() {
-                    const sortKey = this.getAttribute('data-sort');
-                    sortDirection[sortKey] = !sortDirection[sortKey] ? 'asc' : sortDirection[sortKey] === 'asc' ? 'desc' : 'asc';
-
-                    document.querySelectorAll('th[data-sort]').forEach(th => {
-                        th.classList.remove('sorted-asc', 'sorted-desc');
-                        th.querySelector('i.fa-sort').className = 'fas fa-sort ml-1';
-                    });
-                    this.classList.add(`sorted-${sortDirection[sortKey]}`);
-                    sortTable(sortKey, sortDirection[sortKey]);
-                });
-            });
-
-            function sortTable(key, direction) {
-                const tbody = document.querySelector('#reportsTable tbody');
-                const rows = Array.from(tbody.querySelectorAll('.report-row'));
-                rows.sort((a, b) => {
-                    let aValue = a.querySelector(`td:nth-child(${key === 'report_id' ? 1 : key === 'type' ? 2 : key === 'employee' ? 3 : key === 'period' ? 4 : 5})`)?.textContent || '';
-                    let bValue = b.querySelector(`td:nth-child(${key === 'report_id' ? 1 : key === 'type' ? 2 : key === 'employee' ? 3 : key === 'period' ? 4 : 5})`)?.textContent || '';
-                    if (key === 'generated_at') {
-                        aValue = new Date(aValue.split('/').reverse().join('-') + ' 00:00:00').getTime();
-                        bValue = new Date(bValue.split('/').reverse().join('-') + ' 00:00:00').getTime();
-                    }
-                    return direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-                });
-                tbody.innerHTML = '';
-                rows.forEach(row => tbody.appendChild(row));
-            }
-
-            // Export to CSV with Loading State
-            document.getElementById('exportCsvButton').addEventListener('click', function() {
-                const button = this;
-                const spinner = document.getElementById('exportSpinner');
-                button.disabled = true;
-                spinner.classList.remove('hidden');
-                setTimeout(() => {
-                    try {
-                        const reports = JSON.parse('{{ $reports->map(function($report) {
-                            return [
-                                "report_id" => $report->report_id,
-                                "type" => str_replace("_", " ", ucfirst($report->type)),
-                                "employee" => $report->employee ? $report->employee->name . " (" . $report->employee->employee_id . ")" : "All Employees",
-                                "period" => $report->period,
-                                "generated_at" => $report->created_at->format("d/m/Y H:i")
-                            ];
-                        })->toJson() }}');
-                        const headers = ['Report ID', 'Type', 'Employee', 'Period', 'Generated At'];
-                        const csvRows = [headers.join(',')];
-                        reports.forEach(report => {
-                            const row = [
-                                report.report_id || '',
-                                `"${(report.type || '').replace(/"/g, '""')}"`,
-                                `"${(report.employee || '').replace(/"/g, '""')}"`,
-                                report.period || '',
-                                report.generated_at || ''
-                            ];
-                            csvRows.push(row.join(','));
-                        });
-                        const csvContent = csvRows.join('\n');
-                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = 'reports.csv';
-                        link.click();
-                        URL.revokeObjectURL(link.href);
-                    } catch (e) {
-                        console.error('Error exporting CSV:', e);
-                        alert('Failed to export CSV. Please try again.');
-                    } finally {
-                        button.disabled = false;
-                        spinner.classList.add('hidden');
-                    }
-                }, 500);
-            });
-
-            // Form Validation with Loading State
+        document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('generateReportForm');
             if (form) {
                 form.addEventListener('submit', function(e) {
                     let valid = true;
-                    const spinner = document.getElementById('formSpinner');
                     form.querySelectorAll('[required]').forEach(input => {
                         const errorElement = document.getElementById(`${input.id}Error`);
                         if (!input.value.trim()) {
@@ -344,15 +298,26 @@
                     });
                     if (!valid) {
                         e.preventDefault();
-                    } else {
-                        e.preventDefault();
-                        const submitButton = form.querySelector('button[type="submit"]');
-                        submitButton.disabled = true;
-                        spinner.classList.remove('hidden');
-                        setTimeout(() => {
-                            form.submit();
-                        }, 500);
+                        return;
                     }
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    const spinner = form.querySelector('#formSpinner');
+                    submitButton.disabled = true;
+                    if (spinner) spinner.classList.remove('hidden');
+                });
+            }
+
+            const searchInput = document.getElementById('searchReport');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const searchValue = this.value.toLowerCase();
+                    const rows = document.querySelectorAll('.report-row');
+                    rows.forEach(row => {
+                        const reportId = row.dataset.reportId || '';
+                        const employee = row.dataset.employee || '';
+                        const matches = reportId.includes(searchValue) || employee.includes(searchValue);
+                        row.style.display = matches ? '' : 'none';
+                    });
                 });
             }
         });

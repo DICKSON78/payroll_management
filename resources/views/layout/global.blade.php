@@ -7,178 +7,49 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * {
-            font-family: 'Poppins', sans-serif;
-        }
-        .sidebar {
-            background: linear-gradient(135deg, #1a365d 0%, #153e75 100%);
-            transition: width 0.3s ease-in-out;
-            width: 256px;
-        }
-        .sidebar.collapsed {
-            width: 64px;
-        }
-        .sidebar.collapsed .sidebar-text {
-            display: none;
-        }
-        .sidebar.collapsed .sidebar-link {
-            justify-content: center;
-            padding: 0.75rem 0;
-        }
-        .sidebar-text {
-            visibility: visible;
-            opacity: 1;
-            transition: visibility 0s linear 0.2s, opacity 0.2s ease-in-out 0.2s;
-            animation: fadeIn 0.2s ease-in-out;
-        }
-        .sidebar-link {
-            transition: all 0.2s;
-            padding: 0.75rem 1rem;
-            border-radius: 0.375rem;
-            display: flex;
-            align-items: center;
-        }
-        .sidebar-link:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-        .sidebar-link.active {
-            background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
-        }
-        .sidebar.collapsed .sidebar-link.active {
-            border-radius: 0.375rem;
-            width: 48px;
-            margin: 0 auto;
-        }
-        .card {
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            background: white;
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-        }
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.4em 0.8em;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            line-height: 1;
-        }
-        .status-pending {
-            background-color: #fffbeb;
-            color: #f59e0b;
-        }
-        .status-paid {
-            background-color: #d1fae5;
-            color: #10b981;
-        }
-        .status-processing {
-            background-color: #dbeafe;
-            color: #3b82f6;
-        }
-        .payroll-badge {
-            background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
-            color: white;
-        }
-        .stat-card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .nav-item {
-            transition: all 0.2s;
-        }
-        .nav-item:hover {
-            background-color: #f3f4f6;
-            border-radius: 0.5rem;
-        }
-        .header {
-            background: #ffffff;
-            border-bottom: 1px solid #e5e7eb;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            padding: 1rem 2rem;
-        }
-        .main-content {
-            transition: margin-left 0.3s ease-in-out;
-        }
-        .main-content.collapsed {
-            margin-left: 64px;
-        }
-        /* Modal animation */
-        .modal-content {
-            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-        }
-        #addEmployeeModal:not(.hidden) .modal-content,
-        #editEmployeeModal:not(.hidden) .modal-content,
-        #deactivateConfirmModal:not(.hidden) .modal-content,
-        #deleteConfirmModal:not(.hidden) .modal-content,
-        #viewEmployeeModal:not(.hidden) .modal-content {
-            transform: scale(1);
-            opacity: 1;
-        }
-        #addEmployeeModal.hidden .modal-content,
-        #editEmployeeModal.hidden .modal-content,
-        #deactivateConfirmModal.hidden .modal-content,
-        #deleteConfirmModal.hidden .modal-content,
-        #viewEmployeeModal.hidden .modal-content {
-            transform: scale(0.95);
-            opacity: 0;
-        }
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateX(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
+        * { font-family: 'Poppins', sans-serif; }
+        .sidebar { background: linear-gradient(135deg, #1a365d 0%, #153e75 100%); transition: width 0.3s ease-in-out; width: 256px; }
+        .sidebar.collapsed { width: 64px; }
+        .sidebar.collapsed .sidebar-text { display: none; }
+        .sidebar.collapsed .sidebar-link { justify-content: center; padding: 0.75rem 0; }
+        .sidebar-text { visibility: visible; opacity: 1; transition: visibility 0s linear 0.2s, opacity 0.2s ease-in-out 0.2s; animation: fadeIn 0.2s ease-in-out; }
+        .sidebar-link { transition: all 0.2s; padding: 0.75rem 1rem; border-radius: 0.375rem; display: flex; align-items: center; }
+        .sidebar-link:hover { background-color: rgba(255, 255, 255, 0.1); }
+        .sidebar-link.active { background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%); }
+        .sidebar.collapsed .sidebar-link.active { border-radius: 0.375rem; width: 48px; margin: 0 auto; }
+        .card { transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background: white; border-radius: 0.75rem; padding: 1.5rem; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); }
+        .btn-primary { background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%); color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
+        .status-badge { display: inline-flex; align-items: center; padding: 0.4em 0.8em; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; line-height: 1; }
+        .status-pending { background-color: #fffbeb; color: #f59e0b; }
+        .status-paid { background-color: #d1fae5; color: #10b981; }
+        .status-processing { background-color: #dbeafe; color: #3b82f6; }
+        .payroll-badge { background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%); color: white; }
+        .stat-card-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+        .nav-item { transition: all 0.2s; }
+        .nav-item:hover { background-color: #f3f4f6; border-radius: 0.5rem; }
+        .header { background: #ffffff; border-bottom: 1px solid #e5e7eb; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); padding: 1rem 2rem; }
+        .main-content { transition: margin-left 0.3s ease-in-out; }
+        .main-content.collapsed { margin-left: 64px; }
+        .modal-content { transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out; }
+        #addEmployeeModal:not(.hidden) .modal-content, #editEmployeeModal:not(.hidden) .modal-content,
+        #deactivateConfirmModal:not(.hidden) .modal-content, #deleteConfirmModal:not(.hidden) .modal-content,
+        #viewEmployeeModal:not(.hidden) .modal-content { transform: scale(1); opacity: 1; }
+        #addEmployeeModal.hidden .modal-content, #editEmployeeModal.hidden .modal-content,
+        #deactivateConfirmModal.hidden .modal-content, #deleteConfirmModal.hidden .modal-content,
+        #viewEmployeeModal.hidden .modal-content { transform: scale(0.95); opacity: 0; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
         @media (max-width: 768px) {
-            .sidebar {
-                width: 256px;
-                transform: translateX(-100%);
-                position: fixed;
-                z-index: 50;
-                height: 100vh;
-            }
-            .sidebar.active {
-                transform: translateX(0);
-            }
-            .sidebar.collapsed {
-                transform: translateX(-100%);
-            }
-            .main-content {
-                margin-left: 0;
-            }
-            .main-content.collapsed {
-                margin-left: 0;
-            }
+            .sidebar { width: 256px; transform: translateX(-100%); position: fixed; z-index: 50; height: 100vh; }
+            .sidebar.active { transform: translateX(0); }
+            .sidebar.collapsed { transform: translateX(-100%); }
+            .main-content { margin-left: 0; }
+            .main-content.collapsed { margin-left: 0; }
         }
     </style>
 </head>
@@ -192,54 +63,26 @@
             </div>
             <nav class="flex-1">
                 <ul class="space-y-2">
-                    <li>
-                        <a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            <span class="sidebar-text">Dashboard</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('employees') }}" class="sidebar-link {{ request()->routeIs('employees*') ? 'active' : '' }}">
-                            <i class="fas fa-users mr-3"></i>
-                            <span class="sidebar-text">Employees</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('payroll') }}" class="sidebar-link {{ request()->routeIs('payroll*') ? 'active' : '' }}">
-                            <i class="fas fa-file-invoice-dollar mr-3"></i>
-                            <span class="sidebar-text">Payroll</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('reports') }}" class="sidebar-link {{ request()->routeIs('reports*') ? 'active' : '' }}">
-                            <i class="fas fa-chart-bar mr-3"></i>
-                            <span class="sidebar-text">Reports</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('compliance') }}" class="sidebar-link {{ request()->routeIs('compliance*') ? 'active' : '' }}">
-                            <i class="fas fa-shield-alt mr-3"></i>
-                            <span class="sidebar-text">Compliance</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('attendance') }}" class="sidebar-link {{ request()->routeIs('attendance*') ? 'active' : '' }}">
-                            <i class="fas fa-clock mr-3"></i>
-                            <span class="sidebar-text">Attendance</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}">
-                            <i class="fas fa-user-circle mr-3"></i>
-                            <span class="sidebar-text">Employee Portal</span>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="{{ route('settings') }}" class="sidebar-link {{ request()->routeIs('settings*') ? 'active' : '' }}">
-                            <i class="fas fa-cog mr-3"></i>
-                            <span class="sidebar-text">Settings</span>
-                        </a>
-                    </li>
+                    @php
+                        $user = Auth::check() ? Auth::user() : null;
+                        $role = $user ? strtolower($user->role) : '';
+                    @endphp
+
+                    @if($user && in_array($role, ['admin','hr']))
+                        {{-- Admin / HR Links --}}
+                        <li><a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="fas fa-tachometer-alt mr-3"></i><span class="sidebar-text">Dashboard</span></a></li>
+                        <li><a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees*') ? 'active' : '' }}"><i class="fas fa-users mr-3"></i><span class="sidebar-text">Employees</span></a></li>
+                        <li><a href="{{ route('payroll') }}" class="sidebar-link {{ request()->routeIs('payroll*') ? 'active' : '' }}"><i class="fas fa-file-invoice-dollar mr-3"></i><span class="sidebar-text">Payroll</span></a></li>
+                        <li><a href="{{ route('reports') }}" class="sidebar-link {{ request()->routeIs('reports*') ? 'active' : '' }}"><i class="fas fa-chart-bar mr-3"></i><span class="sidebar-text">Reports</span></a></li>
+                        <li><a href="{{ route('compliance.index') }}" class="sidebar-link {{ request()->routeIs('compliance*') ? 'active' : '' }}"><i class="fas fa-shield-alt mr-3"></i><span class="sidebar-text">Compliance</span></a></li>
+                        <li><a href="{{ route('dashboard.attendance') }}" class="sidebar-link {{ request()->routeIs('dashboard.attendance') ? 'active' : '' }}"><i class="fas fa-clock mr-3"></i><span class="sidebar-text">Attendance</span></a></li>
+                        <li><a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}"><i class="fas fa-user-circle mr-3"></i><span class="sidebar-text">Employee Portal</span></a></li>
+                        <li><a href="{{ route('settings') }}" class="sidebar-link {{ request()->routeIs('settings*') ? 'active' : '' }}"><i class="fas fa-cog mr-3"></i><span class="sidebar-text">Settings</span></a></li>
+                    @elseif($user)
+                        {{-- Employee Links --}}
+                        <li><a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}"><i class="fas fa-user-circle mr-3"></i><span class="sidebar-text">Employee Portal</span></a></li>
+                        <li><a href="{{ route('portal.attendance') }}" class="sidebar-link {{ request()->routeIs('portal.attendance') ? 'active' : '' }}"><i class="fas fa-clock mr-3"></i><span class="sidebar-text">Attendance</span></a></li>
+                    @endif
                 </ul>
             </nav>
         </div>
@@ -270,13 +113,25 @@
                             <i class="fas fa-user text-white"></i>
                         </div>
                         <div>
-                            <p class="text-sm font-medium text-gray-800">{{ Auth::user()->name }}</p>
-                            <p class="text-xs text-gray-500">{{ Auth::user()->role ?? 'Employee' }}</p>
+                            <p class="text-sm font-medium text-gray-800">{{ $user ? $user->name : 'Guest' }}</p>
+                            <p class="text-xs text-gray-500">{{ $user ? ($user->role ?? 'Employee') : 'Guest' }}</p>
                         </div>
                     </div>
-                    <a href="{{ route('logout') }}" class="text-gray-600 hover:text-green-600 p-2 rounded-full hover:bg-gray-100 transition">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </a>
+                    @if($user)
+                        <a href="#"
+                           onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                           class="text-gray-600 hover:text-green-600 p-2 rounded-full hover:bg-gray-100 transition">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </a>
+                        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                            @csrf
+                        </form>
+                    @else
+                        <a href="{{ route('login') }}"
+                           class="text-gray-600 hover:text-green-600 p-2 rounded-full hover:bg-gray-100 transition">
+                            <i class="fas fa-sign-in-alt"></i>
+                        </a>
+                    @endif
                 </div>
             </header>
 
@@ -289,42 +144,13 @@
     @yield('modals')
 
     <script>
-        // Modal functions
-        function openModal(modalId) {
-            console.log('Opening modal:', modalId);
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.classList.remove('hidden');
-            } else {
-                console.error('Modal not found:', modalId);
-            }
-        }
-
-        function closeModal(modalId) {
-            console.log('Closing modal:', modalId);
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.classList.add('hidden');
-            } else {
-                console.error('Modal not found:', modalId);
-            }
-        }
-
-        // Sidebar toggle
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing sidebar');
             const sidebar = document.getElementById('sidebar');
             const mainContent = document.getElementById('main-content');
             const toggleButton = document.getElementById('toggleSidebar');
             const toggleIcon = toggleButton.querySelector('i');
 
-            if (!sidebar || !mainContent || !toggleButton) {
-                console.error('Sidebar elements not found');
-                return;
-            }
-
             toggleButton.addEventListener('click', function() {
-                console.log('Toggling sidebar');
                 sidebar.classList.toggle('collapsed');
                 mainContent.classList.toggle('collapsed');
 
@@ -341,7 +167,6 @@
                 }
             });
 
-            // Initialize sidebar state for mobile
             if (window.innerWidth <= 768) {
                 sidebar.classList.add('collapsed');
                 sidebar.classList.remove('active');

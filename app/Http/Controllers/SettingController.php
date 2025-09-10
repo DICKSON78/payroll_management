@@ -2,34 +2,58 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
+use App\Models\Role;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Validator;
 
 class SettingController extends Controller
 {
+    /**
+     * Show the credentials form
+     */
     public function index()
     {
-        $settings = Setting::first() ?? ['company_name' => 'Default Company', 'currency' => 'TZS', 'tax_rate' => 30.00, 'payroll_cycle' => 'Monthly', 'company_logo' => null];
-        return view('dashboard.setting', compact('settings'));
+        // Angalia kama mtumiaji ame-login na ana role ya 'admin'
+        if (!Auth::check() || Auth::user()->role !== 'admin') {
+            // Kama si admin, mpeleke kwenye ukurasa mwingine na umpe ujumbe wa kosa.
+            return redirect('/home')->with('error', 'Huruhusiwi kufikia ukurasa huu!');
+        }
+
+        $user = Auth::user();
+        return view('dashboard.setting', compact('user'));
     }
 
+    /**
+     * Update admin credentials
+     */
     public function update(Request $request)
     {
-        $validated = $request->validate([
-            'company_name' => 'required|string|max:255',
-            'tax_rate' => 'required|numeric|min:0',
-            'payroll_cycle' => 'required|in:Monthly,Bi-Weekly,Weekly',
-            'currency' => 'required|string|max:10',
-            'company_logo' => 'nullable|image|mimes:jpg,png|max:2048',
+        // Angalia kama mtumiaji ame-login na ana role ya 'admin'
+        if (!Auth::check() || Auth::user()->role !== 'admin') {
+            // Kama si admin, mpeleke kwenye ukurasa mwingine.
+            return redirect('/home')->with('error', 'Huruhusiwi kufanya mabadiliko haya!');
+        }
+
+        $user = Auth::user();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+            'password' => 'nullable|string|min:8|confirmed',
         ]);
 
-        $settings = Setting::firstOrCreate([]);
-        if ($request->hasFile('company_logo')) {
-            $path = $request->file('company_logo')->store('public/logos');
-            $validated['company_logo'] = str_replace('public/', '', $path);
-        }
-        $settings->update($validated);
+        $user->name = $request->name;
+        $user->email = $request->email;
 
-        return redirect()->route('settings.index')->with('success', 'Settings updated successfully.');
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
+        }
+
+        $user->save();
+
+        return redirect()->back()->with('success', 'Credentials updated successfully.');
     }
 }
