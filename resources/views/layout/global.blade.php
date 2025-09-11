@@ -80,9 +80,9 @@
                         <li><a href="{{ route('settings') }}" class="sidebar-link {{ request()->routeIs('settings*') ? 'active' : '' }}"><i class="fas fa-cog mr-3"></i><span class="sidebar-text">Settings</span></a></li>
                     @elseif($user)
                         {{-- Employee Links --}}
+                        <li><a href="{{ route('portal.attendance') }}" class="sidebar-link {{ request()->routeIs('portal.attendance') ? 'active' : '' }}"><i class="fas fa-clock mr-3"></i><span class="sidebar-text">My Attendance</span></a></li>
                         <li><a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}"><i class="fas fa-user-circle mr-3"></i><span class="sidebar-text">Employee Portal</span></a></li>
-                        <li><a href="{{ route('portal.attendance') }}" class="sidebar-link {{ request()->routeIs('portal.attendance') ? 'active' : '' }}"><i class="fas fa-clock mr-3"></i><span class="sidebar-text">Attendance</span></a></li>
-                    @endif
+                   @endif
                 </ul>
             </nav>
         </div>

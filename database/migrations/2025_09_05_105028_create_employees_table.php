@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('position');
             $table->decimal('base_salary', 15, 2);
             $table->decimal('allowances', 15, 2)->nullable();
-            $table->decimal('deductions', 15, 2)->default(0); // <--- Added deductions
+            $table->decimal('deductions', 15, 2)->default(0);
             $table->string('status')->default('Active');
             $table->string('gender')->nullable();
             $table->date('dob')->nullable();
@@ -29,6 +29,12 @@ return new class extends Migration
             $table->string('bank_name')->nullable();
             $table->string('account_number')->nullable();
             $table->string('employment_type')->default('Full-Time');
+
+            // Added the missing compliance numbers
+            $table->string('nssf_number')->nullable();
+            $table->string('nhif_number')->nullable();
+            $table->string('tin_number')->nullable();
+            
             $table->timestamps();
         });
     }

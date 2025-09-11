@@ -1,11 +1,11 @@
 <?php
 
-// App\Models\User.php
 namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Models\Role;
+use App\Models\Employee;
 
 class User extends Authenticatable
 {
@@ -16,7 +16,6 @@ class User extends Authenticatable
         'email',
         'password',
         'role_id',
-
     ];
 
     protected $hidden = [
@@ -29,7 +28,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * Relationship to Role (optional)
+     * Relationship to Role
      */
     public function roleRelation()
     {
@@ -41,10 +40,14 @@ class User extends Authenticatable
      */
     public function getRoleAttribute()
     {
-        // Kama role ipo, tumia hiyo, vinginevyo angalia relation
         return $this->role ?? $this->roleRelation?->slug ?? null;
     }
+
+    /**
+     * Relationship to Employee (based on email)
+     */
+    public function employee()
+    {
+        return $this->hasOne(Employee::class, 'email', 'email');
+    }
 }
-
-
-?>

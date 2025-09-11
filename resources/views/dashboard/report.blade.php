@@ -5,187 +5,314 @@
 @section('header-title')
     <div class="flex items-center space-x-3">
         <span class="text-2xl font-bold text-gray-900">Reports</span>
-        <span class="payroll-badge inline-flex items-center px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">
+        <span class="inline-flex items-center px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full">
             <i class="fas fa-bolt mr-1.5"></i> Premium Plan
         </span>
     </div>
 @endsection
 
 @section('header-subtitle')
-    <span class="text-gray-600">Generate and view payroll and compliance reports for {{ $settings['company_name'] }}.</span>
+    <span class="text-gray-600">Generate and manage payroll and compliance reports for {{ $settings['company_name'] ?? 'Your Company' }}.</span>
 @endsection
 
 @section('content')
-    <!-- Success Message -->
+    <!-- Include Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <!-- Success/Error Message -->
     @if(session('success'))
-    <div class="bg-green-50 border-l-4 border-green-400 text-green-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
-        <span class="block sm:inline">{{ session('success') }}</span>
-    </div>
+        <div class="bg-green-50 border-l-4 border-green-400 text-green-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
+            <span class="block sm:inline">{{ session('success') }}</span>
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="bg-red-50 border-l-4 border-red-400 text-red-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
+            <span class="block sm:inline">{{ session('error') }}</span>
+        </div>
     @endif
 
-    <!-- Quick Actions -->
-    <div class="mb-8">
-        <h3 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
-            <i class="fas fa-bolt text-yellow-500 mr-2"></i> Quick Actions
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300 cursor-pointer" onclick="openModal('generateReportModal')">
-                <div class="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-4">
-                    <i class="fas fa-file-pdf text-purple-600 text-xl"></i>
-                </div>
-                <h4 class="font-semibold text-gray-900">Generate Report</h4>
-                <p class="text-sm text-gray-500 mt-1">Create new payroll or tax reports.</p>
-            </div>
-            <a href="{{ route('reports') }}" class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300">
-                <div class="w-12 h-12 rounded-lg bg-pink-100 flex items-center justify-center mb-4">
-                    <i class="fas fa-list text-pink-600 text-xl"></i>
-                </div>
-                <h4 class="font-semibold text-gray-900">View Reports</h4>
-                <p class="text-sm text-gray-500 mt-1">Review all generated reports.</p>
-            </a>
-            <div class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300 cursor-pointer" onclick="alert('This feature is coming soon!')">
-                <div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center mb-4">
-                    <i class="fas fa-chart-line text-orange-600 text-xl"></i>
-                </div>
-                <h4 class="font-semibold text-gray-900">Analytics</h4>
-                <p class="text-sm text-gray-500 mt-1">Analyze payroll trends and insights.</p>
-            </div>
-            <div class="card hover:shadow-lg transition-all flex flex-col items-center text-center bg-white rounded-xl p-6 border border-gray-200 hover:border-green-300 cursor-pointer" onclick="alert('This feature is coming soon!')">
-                <div class="w-12 h-12 rounded-lg bg-teal-100 flex items-center justify-center mb-4">
-                    <i class="fas fa-cogs text-teal-600 text-xl"></i>
-                </div>
-                <h4 class="font-semibold text-gray-900">Settings</h4>
-                <p class="text-sm text-gray-500 mt-1">Configure report generation settings.</p>
-            </div>
+    <!-- Tab Navigation -->
+    <div class="mb-6">
+        <div class="flex space-x-4 border-b border-gray-200" role="tablist">
+            <button id="allReportsTab" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-t-md focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200" role="tab" aria-selected="true" aria-controls="reportsTableContainer">
+                All Reports
+            </button>
+            <button id="generateReportTab" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-t-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200" role="tab" aria-selected="false" aria-controls="generateReportFormContainer">
+                Generate Report
+            </button>
         </div>
     </div>
 
-    <!-- Search Input -->
-    <div class="mb-6 relative">
-        <div class="relative max-w-md">
+    <!-- Reports Table Container -->
+    <div id="reportsTableContainer" class="block">
+        <!-- Search Input -->
+        <div class="mb-6 relative max-w-md">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.65a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                 </svg>
             </div>
-            <input id="searchReport" type="text" placeholder="Search by report ID or employee..." class="pl-10 w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-green-500 transition duration-150 bg-white shadow-sm text-gray-900 placeholder-gray-500">
+            <input id="searchReport" type="text" placeholder="Search by report ID, employee, or type..." class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" aria-label="Search reports by ID, employee, or type">
         </div>
-    </div>
 
-    <!-- Recent Reports Table -->
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div class="flex justify-between items-center px-6 pt-6 mb-4">
+        <!-- Reports Table Header -->
+        <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-medium text-gray-700 flex items-center">
                 <i class="fas fa-file-alt text-green-500 mr-2"></i> Recent Reports
                 <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $reports->total() }} reports</span>
             </h3>
         </div>
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead>
-                    <tr class="bg-gray-50/80 border-b border-gray-200 text-gray-600 text-sm">
-                        <th class="py-3.5 px-6 text-left font-semibold">Report ID</th>
-                        <th class="py-3.5 px-6 text-left font-semibold">Type</th>
-                        <th class="py-3.5 px-6 text-left font-semibold">Period</th>
-                        <th class="py-3.5 px-6 text-left font-semibold">Employee</th>
-                        <th class="py-3.5 px-6 text-left font-semibold">Format</th>
-                        <th class="py-3.5 px-6 text-left font-semibold">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="reportsTable" class="divide-y divide-gray-100">
-                    @foreach($reports as $report)
-                    @php
-                        $formatColors = [
-                            'pdf' => 'bg-purple-100 text-purple-800',
-                            'excel' => 'bg-green-100 text-green-800'
-                        ];
-                        $formatColor = $formatColors[strtolower($report->export_format)] ?? 'bg-gray-100 text-gray-800';
-                    @endphp
-                    <tr id="report-{{ $report->id }}" class="bg-white hover:bg-gray-50/50 transition duration-150 report-row" data-report-id="{{ strtolower($report->report_id) }}" data-employee="{{ strtolower($report->employee->name ?? 'all') }}">
-                        <td class="py-4 px-6 text-sm text-gray-900 font-mono">{{ $report->report_id }}</td>
-                        <td class="py-4 px-6 text-sm text-gray-700">{{ ucwords(str_replace('_', ' ', $report->type)) }}</td>
-                        <td class="py-4 px-6 text-sm text-gray-900">{{ $report->period }}</td>
-                        <td class="py-4 px-6">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                                    <span class="font-medium text-green-800">{{ $report->employee ? substr($report->employee->name, 0, 1) : 'A' }}</span>
-                                </div>
-                                <div>
-                                    <div class="font-medium text-gray-900">{{ $report->employee->name ?? 'All' }}</div>
-                                    <div class="text-sm text-gray-500">{{ $report->employee->email ?? 'N/A' }}</div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="py-4 px-6">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $formatColor }}">
-                                <span class="w-2 h-2 bg-{{ strtolower($report->export_format) == 'pdf' ? 'purple' : 'green' }}-500 rounded-full mr-1.5"></span>
-                                {{ strtoupper($report->export_format) }}
-                            </span>
-                        </td>
-                        <td class="py-4 px-6">
-                            <div class="flex items-center space-x-2">
-                                <a href="{{ route('reports.download', ['id' => $report->id]) }}" class="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition duration-150" title="Download">
-                                    <i class="fas fa-download text-sm"></i>
-                                </a>
-                                <form action="{{ route('reports.destroy', ['id' => $report->id]) }}" method="POST" class="inline-block" onsubmit="return confirm('Are you sure you want to delete this report?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition duration-150" title="Delete">
-                                        <i class="fas fa-trash text-sm"></i>
-                                    </button>
-                                </form>
-                            </div>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-        <!-- Empty State -->
-        @if($reports->count() == 0)
-        <div class="text-center py-12">
-            <div class="mx-auto w-24 h-24 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                <i class="fas fa-file-alt text-gray-400 text-2xl"></i>
+
+        <!-- Table Container -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-700 text-sm">
+                            <th class="py-3.5 px-6 text-left font-semibold">Report ID</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Type</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Period</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Employee</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Format</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Status</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportsTable" class="divide-y divide-gray-100">
+                        @foreach($reports as $report)
+                            @php
+                                $formatColors = [
+                                    'pdf' => 'bg-purple-100 text-purple-800',
+                                    'excel' => 'bg-green-100 text-green-800'
+                                ];
+                                $formatColor = $formatColors[strtolower($report->export_format ?? 'pdf')] ?? 'bg-gray-100 text-gray-800';
+                                $statusColors = [
+                                    'pending' => 'bg-yellow-100 text-yellow-800',
+                                    'completed' => 'bg-green-100 text-green-800',
+                                    'failed' => 'bg-red-100 text-red-800'
+                                ];
+                                $statusColor = $statusColors[$report->status ?? 'completed'] ?? 'bg-gray-100 text-gray-800';
+                                $filePath = 'reports/' . "{$report->report_id}_{$report->type}_{$report->period}.{$report->export_format}";
+                                $fileExists = Storage::disk('public')->exists($filePath);
+                            @endphp
+                            <tr id="report-{{ $report->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 report-row group" data-report-id="{{ strtolower($report->report_id ?? '') }}" data-employee="{{ strtolower($report->employee->name ?? 'all') }}" data-type="{{ strtolower($report->type ?? '') }}">
+                                <td class="py-4 px-6 text-sm text-gray-900 font-mono">{{ $report->report_id ?? 'N/A' }}</td>
+                                <td class="py-4 px-6 text-sm text-gray-700">{{ ucwords(str_replace('_', ' ', $report->type ?? 'unknown')) }}</td>
+                                <td class="py-4 px-6 text-sm text-gray-900">{{ $report->period ?? 'N/A' }}</td>
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="font-medium text-green-800">{{ $report->employee ? substr($report->employee->name, 0, 1) : 'A' }}</span>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-gray-900">{{ $report->employee->name ?? 'All Employees' }}</div>
+                                            <div class="text-sm text-gray-500">{{ $report->employee->email ?? 'N/A' }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-6">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $formatColor }}">
+                                        {{ strtoupper($report->export_format ?? 'PDF') }}
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusColor }}">
+                                        {{ ucfirst($report->status ?? 'Completed') }}
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center space-x-2">
+                                        @if($report->status === 'completed' && $fileExists)
+                                            <a href="{{ route('reports.download', $report->id) }}" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Download Report" aria-label="Download {{ $report->type }} report">
+                                                <i class="fas fa-download text-sm"></i>
+                                            </a>
+                                        @else
+                                            <span class="text-gray-400 p-1.5 cursor-not-allowed" title="Download Unavailable" aria-label="Download unavailable for {{ $report->type }} report">
+                                                <i class="fas fa-download text-sm"></i>
+                                            </span>
+                                        @endif
+                                        <button onclick="openDeleteModal({{ $report->id }}, '{{ $report->report_id }}')" class="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition-all duration-200" title="Delete Report" aria-label="Delete {{ $report->type }} report">
+                                            <i class="fas fa-trash-alt text-sm"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-            <h3 class="text-lg font-medium text-gray-900 mb-1">No reports found</h3>
-            <p class="text-gray-500 mb-6">Get started by generating your first report.</p>
-            <button class="text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 font-medium rounded-md text-sm px-4 py-2 text-center transition-all duration-200 inline-flex items-center shadow-sm hover:shadow-md" onclick="openModal('generateReportModal')">
-                <i class="fas fa-file-pdf mr-2"></i> Generate Report
-            </button>
+
+            <!-- Empty State -->
+            @if($reports->count() == 0)
+                <div class="text-center py-12">
+                    <div class="mx-auto w-24 h-24 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                        <i class="fas fa-file-alt text-gray-400 text-2xl"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-1">No reports found</h3>
+                    <p class="text-gray-500 mb-6">Get started by generating your first report.</p>
+                    <button class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 inline-flex items-center shadow-sm hover:shadow-md" onclick="toggleTab('generateReportTab')">
+                        <i class="fas fa-plus mr-2"></i> Generate Report
+                    </button>
+                </div>
+            @endif
         </div>
+
+        <!-- Custom Pagination -->
+        @if($reports->lastPage() > 1)
+            <div class="mt-6 flex justify-center">
+                <nav class="flex items-center space-x-2" aria-label="Pagination">
+                    <!-- Previous Button -->
+                    <a href="{{ $reports->previousPageUrl() ? $reports->previousPageUrl() . ($reports->previousPageUrl() && $reports->url($reports->currentPage()) ? '&' : '?') . http_build_query(request()->query()) : '#' }}"
+                       class="px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 {{ $reports->onFirstPage() ? 'text-gray-400 bg-gray-100 cursor-not-allowed' : 'text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-800' }}"
+                       aria-label="Previous page"
+                       {{ $reports->onFirstPage() ? 'disabled' : '' }}>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </a>
+
+                    <!-- Page Numbers -->
+                    @php
+                        $currentPage = $reports->currentPage();
+                        $lastPage = $reports->lastPage();
+                        $range = 2; // Show 2 pages before and after current page
+                        $start = max(1, $currentPage - $range);
+                        $end = min($lastPage, $currentPage + $range);
+
+                        if ($end - $start < 2 * $range) {
+                            if ($start == 1) {
+                                $end = min($lastPage, $start + 2 * $range);
+                            } elseif ($end == $lastPage) {
+                                $start = max(1, $end - 2 * $range);
+                            }
+                        }
+                    @endphp
+
+                    @if($start > 1)
+                        <a href="{{ $reports->url(1) . ($reports->url(1) ? '&' : '?') . http_build_query(request()->query()) }}"
+                           class="px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-800 rounded-md transition-all duration-200"
+                           aria-label="Page 1">1</a>
+                        @if($start > 2)
+                            <span class="px-3 py-2 text-sm text-gray-500">...</span>
+                        @endif
+                    @endif
+
+                    @for($page = $start; $page <= $end; $page++)
+                        <a href="{{ $reports->url($page) . ($reports->url($page) ? '&' : '?') . http_build_query(request()->query()) }}"
+                           class="px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 {{ $page == $currentPage ? 'text-white bg-green-600' : 'text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-800' }}"
+                           aria-label="Page {{ $page }}"
+                           aria-current="{{ $page == $currentPage ? 'page' : 'false' }}">{{ $page }}</a>
+                    @endfor
+
+                    @if($end < $lastPage)
+                        @if($end < $lastPage - 1)
+                            <span class="px-3 py-2 text-sm text-gray-500">...</span>
+                        @endif
+                        <a href="{{ $reports->url($lastPage) . ($reports->url($lastPage) ? '&' : '?') . http_build_query(request()->query()) }}"
+                           class="px-3 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-800 rounded-md transition-all duration-200"
+                           aria-label="Page {{ $lastPage }}">{{ $lastPage }}</a>
+                    @endif
+
+                    <!-- Next Button -->
+                    <a href="{{ $reports->nextPageUrl() ? $reports->nextPageUrl() . ($reports->nextPageUrl() && $reports->url($reports->currentPage()) ? '&' : '?') . http_build_query(request()->query()) : '#' }}"
+                       class="px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 {{ $reports->hasMorePages() ? 'text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-800' : 'text-gray-400 bg-gray-100 cursor-not-allowed' }}"
+                       aria-label="Next page"
+                       {{ !$reports->hasMorePages() ? 'disabled' : '' }}>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </nav>
+            </div>
         @endif
     </div>
 
-    <!-- Pagination -->
-    @if($reports->hasPages())
-    <div class="mt-6 flex items-center justify-between border-t border-gray-200 pt-5">
-        <div class="text-sm text-gray-700">
-            Showing {{ $reports->firstItem() }} to {{ $reports->lastItem() }} of {{ $reports->total() }} results
-        </div>
-        <div class="flex space-x-2">
-            @if($reports->onFirstPage())
-            <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Previous</span>
-            @else
-            <a href="{{ $reports->previousPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Previous</a>
-            @endif
-            @if($reports->hasMorePages())
-            <a href="{{ $reports->nextPageUrl() }}" class="px-3 py-1.5 rounded-md bg-white border border-gray-300 text-gray-700 text-sm hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Next</a>
-            @else
-            <span class="px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 text-sm">Next</span>
-            @endif
+    <!-- Generate Report Form Container -->
+    <div id="generateReportFormContainer" class="hidden">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 sm:p-8">
+            <h3 class="text-xl font-semibold text-green-600 flex items-center mb-6">
+                <i class="fas fa-plus mr-2"></i> Generate New Report
+            </h3>
+            <form id="generateReportForm" action="{{ route('reports.generate') }}" method="POST" class="space-y-6">
+                @csrf
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                        <label for="report_type" class="block text-gray-600 text-sm font-medium mb-2">Report Type</label>
+                        <select name="report_type" id="report_type" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900">
+                            <option value="">Select a report type</option>
+                            <option value="payslip">Payslip</option>
+                            <option value="payroll_summary">Payroll Summary</option>
+                            <option value="tax_report">Tax Report</option>
+                            <option value="nssf_report">NSSF Report</option>
+                            <option value="nhif_report">NHIF Report</option>
+                            <option value="wcf_report">WCF Report</option>
+                            <option value="sdl_report">SDL Report</option>
+                            <option value="year_end_summary">Year-End Summary</option>
+                        </select>
+                        <span class="text-red-500 text-xs mt-1 hidden" id="reportTypeError">Report Type is required</span>
+                        @error('report_type')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div class="relative">
+                        <label for="report_period" class="block text-gray-600 text-sm font-medium mb-2">Report Period</label>
+                        <div class="relative w-full">
+                            <input type="text" name="report_period" id="report_period" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900 pr-10" placeholder="Select period" readonly>
+                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <i class="fas fa-calendar-alt text-gray-400"></i>
+                            </span>
+                        </div>
+                        <span class="text-red-500 text-xs mt-1 hidden" id="reportPeriodError">Report Period is required</span>
+                        @error('report_period')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="employee_id" class="block text-gray-600 text-sm font-medium mb-2">Specific Employee (Optional)</label>
+                        <select name="employee_id" id="employee_id" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900">
+                            <option value="">All Employees</option>
+                            @foreach($employees ?? [] as $employee)
+                                <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->employee_id }})</option>
+                            @endforeach
+                        </select>
+                        @error('employee_id')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="export_format" class="block text-gray-600 text-sm font-medium mb-2">Export Format</label>
+                        <select name="export_format" id="export_format" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900">
+                            <option value="pdf">PDF</option>
+                            <option value="excel">Excel</option>
+                        </select>
+                        <span class="text-red-500 text-xs mt-1 hidden" id="exportFormatError">Export Format is required</span>
+                        @error('export_format')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center" onclick="toggleTab('allReportsTab')">
+                        <i class="fas fa-times mr-2"></i> Cancel
+                    </button>
+                    <button type="submit" id="generateReportSubmit" class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center">
+                        <span id="formSpinner" class="hidden animate-spin h-4 w-4 mr-2 border-t-2 border-r-2 border-white rounded-full"></span>
+                        <i class="fas fa-check mr-2"></i> Generate Report
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
-    @endif
 
-    <!-- Generate Report Modal -->
-    <div id="generateReportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-labelledby="generateReportModalTitle" aria-modal="true">
-        <div class="bg-white rounded-xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content">
-            <div class="p-6 bg-gradient-to-r from-green-50 to-blue-50 border-b">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-xl font-semibold text-green-600 flex items-center" id="generateReportModalTitle">
-                        <i class="fas fa-file-pdf mr-2"></i> Generate Report
+    <!-- Delete Report Modal -->
+    <div id="deleteReportModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50" aria-hidden="true">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content" role="dialog" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalDesc">
+            <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100">
+                <div class="flex justify-between items-center">
+                    <h3 id="deleteModalTitle" class="text-xl font-semibold text-red-700 flex items-center">
+                        <i class="fas fa-exclamation-circle mr-2"></i> Delete Report
                     </h3>
-                    <button type="button" onclick="closeModal('generateReportModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition duration-150">
+                    <button type="button" onclick="closeModal('deleteReportModal')" class="text-gray-500 hover:text-gray-700 rounded-full p-2 hover:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300" aria-label="Close delete modal">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -193,83 +320,196 @@
                 </div>
             </div>
             <div class="p-6">
-                <form id="generateReportForm" action="{{ route('reports.generate') }}" method="POST" class="space-y-4">
-                    @csrf
-                    <div class="grid grid-cols-1 gap-4">
-                        <div>
-                            <label for="report_type" class="block text-gray-600 text-sm font-medium mb-2">Report Type</label>
-                            <select name="report_type" id="report_type" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
-                                <option value="">Select a report type</option>
-                                <option value="payroll_summary">Payroll Summary</option>
-                                <option value="tax_report">Tax Report</option>
-                                <option value="payslip">Payslip</option>
-                            </select>
-                            <span class="text-red-500 text-sm hidden" id="reportTypeError">Report Type is required</span>
-                            @error('report_type')
-                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div>
-                            <label for="report_period" class="block text-gray-600 text-sm font-medium mb-2">Report Period</label>
-                            <input type="month" name="report_period" id="report_period" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
-                            <span class="text-red-500 text-sm hidden" id="reportPeriodError">Report Period is required</span>
-                            @error('report_period')
-                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div>
-                            <label for="employee_id" class="block text-gray-600 text-sm font-medium mb-2">Specific Employee (Optional)</label>
-                            <select name="employee_id" id="employee_id" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
-                                <option value="">All Employees</option>
-                                @foreach($employees as $employee)
-                                <option value="{{ $employee->id }}">{{ $employee->name }}</option>
-                                @endforeach
-                            </select>
-                            @error('employee_id')
-                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-                        <div>
-                            <label for="export_format" class="block text-gray-600 text-sm font-medium mb-2">Export Format</label>
-                            <select name="export_format" id="export_format" required class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2.5">
-                                <option value="pdf">PDF</option>
-                                <option value="excel">Excel</option>
-                            </select>
-                            <span class="text-red-500 text-sm hidden" id="exportFormatError">Export Format is required</span>
-                            @error('export_format')
-                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-                    </div>
-                    <div class="flex justify-end space-x-3 mt-4">
-                        <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-700 hover:from-gray-600 hover:to-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200" onclick="closeModal('generateReportModal')">
-                            <i class="fas fa-times mr-2"></i> Cancel
+                <p id="deleteModalDesc" class="text-gray-700 mb-4">Are you sure you want to delete report <span id="deleteReportId" class="font-semibold"></span>? This action is permanent and cannot be undone.</p>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" class="text-gray-700 bg-gray-100 hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 transition-all duration-200 flex items-center" onclick="closeModal('deleteReportModal')" aria-label="Cancel deletion">
+                        <i class="fas fa-times mr-2"></i> Cancel
+                    </button>
+                    <form id="deleteReportForm" method="POST" action="" class="inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-4 py-2 transition-all duration-200 flex items-center">
+                            <i class="fas fa-trash-alt mr-2"></i> Delete Report
                         </button>
-                        <button type="submit" class="text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-200 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-all duration-200">
-                            <span id="formSpinner" class="hidden animate-spin h-4 w-4 mr-2 border-t-2 border-r-2 border-white rounded-full"></span>
-                            <i class="fas fa-file-pdf mr-2"></i> Generate Report
-                        </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
 
-    <script>
-        function openModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.classList.remove('hidden');
-                const modalContent = modal.querySelector('.modal-content');
-                if (modalContent) {
-                    modalContent.classList.remove('scale-95');
-                    modalContent.classList.add('scale-100');
+@endsection
+
+@section('modals')
+    @parent
+@endsection
+
+<!-- Include Flatpickr JS -->
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Flatpickr
+        const reportTypeSelect = document.getElementById('report_type');
+        const reportPeriodInput = document.getElementById('report_period');
+        let flatpickrInstance;
+
+        function initializeFlatpickr() {
+            const isYearly = reportTypeSelect.value === 'year_end_summary';
+            const dateFormat = isYearly ? 'Y' : 'Y-m';
+            const mode = isYearly ? 'single' : 'single';
+            const maxDate = new Date();
+
+            if (flatpickrInstance) {
+                flatpickrInstance.destroy();
+            }
+
+            flatpickrInstance = flatpickr(reportPeriodInput, {
+                dateFormat: dateFormat,
+                mode: mode,
+                maxDate: maxDate,
+                disableMobile: true,
+                altInput: true,
+                altFormat: isYearly ? 'Y' : 'F Y',
+                allowInput: false,
+                static: true,
+                onOpen: function() {
+                    document.querySelector('.flatpickr-calendar').classList.add('bg-white', 'shadow-lg', 'rounded-lg', 'border', 'border-gray-200');
                 }
+            });
+
+            // Ensure Flatpickr altInput matches select input styles
+            const altInput = reportPeriodInput.nextElementSibling;
+            if (altInput && altInput.classList.contains('flatpickr-input')) {
+                altInput.classList.add('bg-gray-50', 'border', 'border-gray-200', 'rounded-lg', 'focus:ring-2', 'focus:ring-green-500', 'focus:border-green-500', 'block', 'w-full', 'py-2.5', 'px-3', 'leading-6', 'transition-all', 'duration-200', 'text-gray-900');
+                altInput.classList.remove('flatpickr-input'); // Remove default Flatpickr class to avoid conflicts
+                altInput.style.paddingRight = '2.5rem'; // Match pr-10 for calendar icon
             }
         }
 
-        function closeModal(modalId) {
-            const modal = document.getElementById(modalId);
+        // Initialize Flatpickr on page load
+        initializeFlatpickr();
+
+        // Update Flatpickr on report type change
+        if (reportTypeSelect && reportPeriodInput) {
+            reportTypeSelect.addEventListener('change', function() {
+                reportPeriodInput.value = ''; // Clear previous selection
+                initializeFlatpickr();
+            });
+        }
+
+        // Tab navigation
+        document.getElementById('allReportsTab').addEventListener('click', () => toggleTab('allReportsTab'));
+        document.getElementById('generateReportTab').addEventListener('click', () => toggleTab('generateReportTab'));
+
+        // Debounced search
+        let searchTimeout;
+        const searchInput = document.getElementById('searchReport');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    const searchValue = this.value.toLowerCase();
+                    const rows = document.querySelectorAll('.report-row');
+                    rows.forEach(row => {
+                        const reportId = row.dataset.reportId || '';
+                        const employee = row.dataset.employee || '';
+                        const type = row.dataset.type || '';
+                        const matches = reportId.includes(searchValue) || employee.includes(searchValue) || type.includes(searchValue);
+                        row.style.display = matches ? '' : 'none';
+                    });
+                }, 300);
+            });
+        }
+
+        // Form validation and spinner
+        const form = document.getElementById('generateReportForm');
+        const submitButton = document.getElementById('generateReportSubmit');
+        const spinner = document.getElementById('formSpinner');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                let valid = true;
+                const fields = [
+                    { id: 'report_type', errorId: 'reportTypeError', message: 'Report Type is required' },
+                    { id: 'report_period', errorId: 'reportPeriodError', message: 'Report Period is required' },
+                    { id: 'export_format', errorId: 'exportFormatError', message: 'Export Format is required' },
+                ];
+
+                fields.forEach(field => {
+                    const input = document.getElementById(field.id);
+                    const error = document.getElementById(field.errorId);
+                    if (!input.value.trim()) {
+                        error.classList.remove('hidden');
+                        valid = false;
+                    } else {
+                        error.classList.add('hidden');
+                    }
+                });
+
+                if (!valid) {
+                    e.preventDefault();
+                    return;
+                }
+
+                submitButton.disabled = true;
+                spinner.classList.remove('hidden');
+            });
+        }
+
+        // Delete modal
+        window.openDeleteModal = function(id, reportId) {
+            document.getElementById('deleteReportForm').action = `/dashboard/reports/${id}`;
+            document.getElementById('deleteReportId').textContent = reportId || 'Unknown';
+            openModal('deleteReportModal');
+        };
+
+        function toggleTab(tabId) {
+            const tabs = ['allReportsTab', 'generateReportTab'];
+            const containers = ['reportsTableContainer', 'generateReportFormContainer'];
+
+            tabs.forEach(id => {
+                const tab = document.getElementById(id);
+                if (tab) {
+                    tab.classList.remove('bg-green-600', 'text-white');
+                    tab.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                    tab.setAttribute('aria-selected', 'false');
+                }
+            });
+
+            containers.forEach(id => {
+                const container = document.getElementById(id);
+                if (container) container.classList.add('hidden');
+            });
+
+            const activeTab = document.getElementById(tabId);
+            if (activeTab) {
+                activeTab.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+                activeTab.classList.add('bg-green-600', 'text-white');
+                activeTab.setAttribute('aria-selected', 'true');
+            }
+
+            const containerId = tabId === 'allReportsTab' ? 'reportsTableContainer' : 'generateReportFormContainer';
+            const container = document.getElementById(containerId);
+            if (container) container.classList.remove('hidden');
+        }
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                setTimeout(() => {
+                    const modalContent = modal.querySelector('.modal-content');
+                    if (modalContent) {
+                        modalContent.classList.remove('scale-95');
+                        modalContent.classList.add('scale-100');
+                    }
+                }, 10);
+                modal.focus();
+            }
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
             if (modal) {
                 const modalContent = modal.querySelector('.modal-content');
                 if (modalContent) {
@@ -277,49 +517,59 @@
                     modalContent.classList.add('scale-95');
                     setTimeout(() => {
                         modal.classList.add('hidden');
+                        modal.setAttribute('aria-hidden', 'true');
                     }, 300);
                 }
             }
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('generateReportForm');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    let valid = true;
-                    form.querySelectorAll('[required]').forEach(input => {
-                        const errorElement = document.getElementById(`${input.id}Error`);
-                        if (!input.value.trim()) {
-                            valid = false;
-                            if (errorElement) errorElement.classList.remove('hidden');
-                        } else {
-                            if (errorElement) errorElement.classList.add('hidden');
-                        }
-                    });
-                    if (!valid) {
-                        e.preventDefault();
-                        return;
-                    }
-                    const submitButton = form.querySelector('button[type="submit"]');
-                    const spinner = form.querySelector('#formSpinner');
-                    submitButton.disabled = true;
-                    if (spinner) spinner.classList.remove('hidden');
-                });
-            }
-
-            const searchInput = document.getElementById('searchReport');
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    const searchValue = this.value.toLowerCase();
-                    const rows = document.querySelectorAll('.report-row');
-                    rows.forEach(row => {
-                        const reportId = row.dataset.reportId || '';
-                        const employee = row.dataset.employee || '';
-                        const matches = reportId.includes(searchValue) || employee.includes(searchValue);
-                        row.style.display = matches ? '' : 'none';
-                    });
-                });
+        // Keyboard navigation for modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal('deleteReportModal');
             }
         });
-    </script>
-@endsection
+    });
+</script>
+
+<style>
+    /* Custom Flatpickr styles to match Tailwind */
+    .flatpickr-calendar {
+        font-family: inherit;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .flatpickr-day.selected, .flatpickr-day.selected:hover {
+        background-color: #10b981;
+        color: white;
+        border-color: #10b981;
+    }
+    .flatpickr-day.today {
+        border-color: #10b981;
+    }
+    .flatpickr-monthDropdown-month, .flatpickr-current-month select, .flatpickr-current-month input {
+        color: #374151;
+        font-weight: 500;
+    }
+    .flatpickr-prev-month, .flatpickr-next-month {
+        color: #10b981;
+    }
+    .flatpickr-prev-month:hover, .flatpickr-next-month:hover {
+        color: #059669;
+    }
+    /* Ensure all inputs have consistent width and styling */
+    #generateReportForm select,
+    #generateReportForm input[type="text"] {
+        box-sizing: border-box;
+        width: 100%;
+        height: 2.5rem; /* Match py-2.5 */
+        font-size: 0.875rem; /* Match text-sm */
+    }
+    /* Override Flatpickr altInput styles */
+    .flatpickr-input.active {
+        box-sizing: border-box;
+        width: 100%;
+        height: 2.5rem;
+        padding-right: 2.5rem; /* Match pr-10 */
+    }
+</style>

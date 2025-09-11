@@ -23,9 +23,9 @@
 <body>
     <div class="container">
         <div class="header">
-            @if($settings['company_logo'])
+            {{-- @if($settings['company_logo'])
                 <img src="{{ asset('storage/' . $settings['company_logo']) }}" alt="Company Logo">
-            @endif
+            @endif --}}
             <h2 class="text-2xl font-semibold">{{ $settings['company_name'] }}</h2>
             <p>Payslip for {{ $employee->name }}</p>
             <p>Period: {{ $payslip->period }}</p>

@@ -31,11 +31,12 @@ class LoginController extends Controller
 
             // Redirect based on role
             $user = Auth::user();
+            $role = strtolower($user->role);
 
-            if ($user->role === 'Admin' || $user->role === 'HR') {
+            if ($role === 'admin' || $role === 'hr') {
                 return redirect()->intended(route('dashboard'));
-            } elseif ($user->role === 'Employee') {
-                return redirect()->intended(route('employee.portal'));
+            } elseif ($role === 'employee') {
+                return redirect()->intended(route('portal.attendance'));
             }
 
             // Default fallback

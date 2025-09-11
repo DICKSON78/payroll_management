@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Attendance;
 use App\Models\LeaveRequest;
 use App\Models\Employee;
+use App\Models\LeaveType; // Ongeza mstari huu
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
@@ -46,41 +47,46 @@ class AttendanceController extends Controller
     /**
      * Display the attendance and leave management dashboard.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = $this->currentUser();
+        $employees = Employee::all();
+        $leaveTypes = LeaveType::all(); // Ongeza mstari huu
 
-        if ($this->hasRole(['admin', 'hr'])) {
-            $attendances = Attendance::with('employee')->get();
-            $leaveRequests = LeaveRequest::with('employee')->get();
-            $employees = Employee::all();
-        } elseif ($this->hasRole('employee')) {
-            $attendances = Attendance::where('employee_id', $user->employee->id)
-                ->with('employee')
-                ->get();
-            $leaveRequests = LeaveRequest::where('employee_id', $user->employee->id)
-                ->with('employee')
-                ->get();
-            $employees = null;
-        } else {
-            abort(403, 'Unauthorized action.');
+        // Initialize attendance query
+        $attendancesQuery = Attendance::with('employee')->orderBy('date', 'desc');
+
+        // Apply search filter for attendance if provided
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $attendancesQuery->whereHas('employee', function($query) use ($search) {
+                $query->where('name', 'like', '%' . $search . '%');
+            });
         }
 
-        return view('dashboard.attendance', compact('attendances', 'leaveRequests', 'employees'));
+        // Filter attendance records based on user role
+        if (strtolower($user->role) === 'employee') {
+            $attendancesQuery->where('employee_id', $user->employee->id ?? 0);
+        }
+
+        $attendances = $attendancesQuery->paginate(6);
+        $leaveRequests = LeaveRequest::with('employee')->latest()->paginate(6);
+
+        return view('dashboard.attendance', compact('attendances', 'leaveRequests', 'employees', 'leaveTypes')); // Ongeza '$leaveTypes' hapa
     }
 
     /**
-     * Store a new attendance record
+     * Store a new attendance record (Admin/HR only).
      */
     public function store(Request $request)
     {
-        $this->authorizeRole(['admin', 'hr']); // Only admin/HR can add attendance
+        $this->authorizeRole(['admin', 'hr']);
 
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required|exists:employees,id',
             'date' => 'required|date',
-            'check_in' => 'required|date_format:H:i',
-            'check_out' => 'nullable|date_format:H:i|after:check_in',
+            'hours_worked' => 'required|numeric|min:0',
+            'overtime_hours' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -89,39 +95,31 @@ class AttendanceController extends Controller
 
         Attendance::create($request->all());
 
-        return redirect()->route('attendance')->with('success', 'Attendance record added successfully.');
+        return redirect()->route('dashboard.attendance')->with('success', 'Attendance record added successfully.');
     }
 
     /**
-     * Show a single attendance record for editing
+     * Show the form for editing attendance (Admin/HR only)
      */
     public function edit($id)
     {
+        $this->authorizeRole(['admin', 'hr']);
+
         $attendance = Attendance::findOrFail($id);
-
-        if ($this->hasRole(['admin', 'hr']) || ($this->hasRole('employee') && $attendance->employee_id == $this->currentUser()->employee->id)) {
-            return response()->json($attendance);
-        }
-
-        abort(403, 'Unauthorized action.');
+        return response()->json($attendance);
     }
 
     /**
-     * Update an attendance record
+     * Update an attendance record (Admin/HR only)
      */
     public function update(Request $request, $id)
     {
+        $this->authorizeRole(['admin', 'hr']);
+
         $attendance = Attendance::findOrFail($id);
-
-        if (!($this->hasRole(['admin', 'hr']) || ($this->hasRole('employee') && $attendance->employee_id == $this->currentUser()->employee->id))) {
-            abort(403, 'Unauthorized action.');
-        }
-
         $validator = Validator::make($request->all(), [
-            'employee_id' => 'required|exists:employees,id',
-            'date' => 'required|date',
-            'check_in' => 'required|date_format:H:i',
-            'check_out' => 'nullable|date_format:H:i|after:check_in',
+            'hours_worked' => 'required|numeric|min:0',
+            'overtime_hours' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -130,31 +128,36 @@ class AttendanceController extends Controller
 
         $attendance->update($request->all());
 
-        return redirect()->route('attendance')->with('success', 'Attendance record updated successfully.');
+        return redirect()->route('dashboard.attendance')->with('success', 'Attendance record updated successfully.');
     }
 
     /**
-     * Handle a new leave request from an employee
+     * Handle leave request
      */
     public function requestLeave(Request $request)
     {
         $user = $this->currentUser();
+        $employee = $user->employee;
 
-        // Only employee can submit leave for themselves, admin/HR can submit for anyone
-        if ($this->hasRole('employee') && $request->employee_id != $user->employee->id) {
-            abort(403, 'Unauthorized action.');
+        if (!$employee) {
+            return redirect()->back()->with('error', 'No employee record found for this user.');
         }
 
         $validator = Validator::make($request->all(), [
             'employee_id' => 'required|exists:employees,id',
-            'leave_type' => 'required|in:sick,vacation,maternity',
+            'leave_type' => 'required|string|exists:leave_types,name', // Badilisha 'in' na 'exists'
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'reason' => 'required|string',
+            'reason' => 'required|string|max:500',
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        // Authorization check: ensure employee only submits for themselves
+        if (strtolower($user->role) === 'employee' && $request->employee_id != $employee->id) {
+            return redirect()->back()->with('error', 'Unauthorized to submit leave request for this employee.');
         }
 
         LeaveRequest::create([
@@ -166,7 +169,52 @@ class AttendanceController extends Controller
             'status' => 'Pending',
         ]);
 
-        return redirect()->route('attendance')->with('success', 'Leave request submitted successfully.');
+        return redirect()->back()->with('success', 'Leave request submitted successfully.');
+    }
+
+    /**
+     * Review leave request
+     */
+    public function reviewLeaveRequest($id)
+    {
+        $this->authorizeRole(['admin', 'hr']);
+
+        $leaveRequest = LeaveRequest::with('employee')->findOrFail($id);
+        return response()->json([
+            'employee_name' => $leaveRequest->employee->name,
+            'leave_type' => $leaveRequest->leave_type,
+            'start_date' => $leaveRequest->start_date->format('Y-m-d'),
+            'end_date' => $leaveRequest->end_date->format('Y-m-d'),
+            'reason' => $leaveRequest->reason,
+            'status' => $leaveRequest->status,
+            'feedback' => $leaveRequest->feedback,
+        ]);
+    }
+
+    /**
+     * Update a leave request status (Admin/HR only)
+     */
+    public function updateLeaveRequest(Request $request, $id)
+    {
+        $this->authorizeRole(['admin', 'hr']);
+
+        $leaveRequest = LeaveRequest::findOrFail($id);
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|in:Approved,Rejected',
+            'feedback' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        $leaveRequest->update([
+            'status' => $request->status,
+            'feedback' => $request->feedback,
+        ]);
+
+        return redirect()->route('dashboard.attendance')->with('success', 'Leave request updated successfully.');
     }
 
     /**
@@ -174,7 +222,7 @@ class AttendanceController extends Controller
      */
     public function export(Request $request)
     {
-        $this->authorizeRole(['admin', 'hr']); // Only admin/HR can export
+        $this->authorizeRole(['admin', 'hr']);
 
         $validator = Validator::make($request->all(), [
             'format' => 'required|in:csv,xlsx',

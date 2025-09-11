@@ -7,10 +7,29 @@ use Illuminate\Database\Eloquent\Model;
 class Employee extends Model
 {
     protected $fillable = [
-        'id', 'employee_id', 'name', 'email', 'department', 'position',
-        'base_salary', 'allowances', 'deductions', 'status', 'gender', 'dob',
-        'nationality', 'phone', 'address', 'hire_date', 'contract_end_date',
-        'bank_name', 'account_number', 'employment_type'
+        'id',
+        'employee_id',
+        'name',
+        'email',
+        'department',
+        'position',
+        'base_salary',
+        'allowances',
+        'deductions',
+        'status',
+        'gender',
+        'dob',
+        'nationality',
+        'phone',
+        'address',
+        'hire_date',
+        'contract_end_date',
+        'bank_name',
+        'account_number',
+        'employment_type',
+        'nssf_number',
+        'nhif_number',
+        'tin_number',
     ];
 
     protected $primaryKey = 'id';

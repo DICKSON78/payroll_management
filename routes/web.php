@@ -54,6 +54,8 @@ Route::prefix('dashboard')->middleware(['auth'])->group(function () {
     // Employee Management
     Route::resource('employees', EmployeeController::class);
     Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.bulk-import');
+    Route::post('/employees/{id}/reset-password', [EmployeeController::class, 'resetPassword'])->name('employees.resetPassword');
+    Route::get('/employees/export', [EmployeeController::class, 'export'])->name('employees.export');
 
     // Payroll
     Route::get('/payroll', [PayrollController::class, 'index'])->name('payroll');
@@ -75,8 +77,13 @@ Route::prefix('dashboard')->middleware(['auth'])->group(function () {
 
     // Attendance (Admin/HR)
     Route::get('/attendance', [AttendanceController::class, 'index'])->name('dashboard.attendance');
-    Route::post('/attendance/store', [AttendanceController::class, 'store'])->name('attendance.store');
+    Route::post('/attendance', [AttendanceController::class, 'store'])->name('attendance.store');
+    Route::get('/attendance/{id}/edit', [AttendanceController::class, 'edit'])->name('attendance.edit');
+    Route::put('/attendance/{id}', [AttendanceController::class, 'update'])->name('attendance.update');
     Route::post('/attendance/export', [AttendanceController::class, 'export'])->name('attendance.export');
+    Route::post('/leave-request', [AttendanceController::class, 'requestLeave'])->name('attendance.requestLeave');
+    Route::get('/leave-request/{id}/review', [AttendanceController::class, 'reviewLeaveRequest'])->name('attendance.reviewLeaveRequest');
+    Route::put('/leave-request/{id}/review', [AttendanceController::class, 'updateLeaveRequest'])->name('attendance.updateLeaveRequest');
 
     // Settings
     Route::get('/settings', [SettingController::class, 'index'])->name('settings');
@@ -103,4 +110,6 @@ Route::prefix('portal')->middleware(['auth'])->group(function () {
     Route::get('/payslips/{id}/download', [EmployeePortalController::class, 'downloadPayslip'])->name('employee.payslip.download');
     Route::get('/attendance', [AttendanceController::class, 'index'])->name('portal.attendance');
     Route::post('/leave/request', [AttendanceController::class, 'requestLeave'])->name('leave.request');
+    Route::get('/attendance/{id}/edit', [AttendanceController::class, 'edit'])->name('portal.attendance.edit');
+    Route::put('/attendance/{id}', [AttendanceController::class, 'update'])->name('portal.attendance.update');
 });

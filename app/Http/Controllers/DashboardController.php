@@ -3,9 +3,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Payroll;
-use App\Models\Payslip;
 use App\Models\Role;
 use App\Models\ComplianceTask;
+use App\Models\Department;
+use App\Models\Bank;
+use App\Models\ComplianceType;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Carbon\Carbon;
@@ -18,46 +20,32 @@ class DashboardController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $employees = Employee::all();
 
-        // Redirect Admin to settings if password has not been changed
-        // if (strtolower($user->role) === 'admin') {
-        //     $settings = Setting::first();
-        //     if (!$settings || !$settings->default_admin_password_changed) {
-        //         return redirect()->route('settings')->with('status', 'Please change your default username and password to secure your account.');
-        //     }
-        // }
+        // Check if the user is an employee and abort if true
+        if (strtolower($user->role) === 'employee') {
+            abort(404);
+        }
 
-
+        // The rest of your dashboard code remains the same
         // Total employees
-        $totalEmployees = strtolower($user->role) !== 'employee' ? Employee::count() : 1; // employee sees only self
+        $totalEmployees = strtolower($user->role) !== 'employee' ? Employee::count() : 1;
 
         // Employee growth (admin/HR only)
         $employeeGrowth = strtolower($user->role) !== 'employee' ? $this->calculateGrowth(Employee::class, 'created_at') : 0;
 
         // Monthly payroll
-        // $monthlyPayroll = strtolower($user->role) !== 'employee'
-        //     ? Payroll::whereMonth('created_at', Carbon::now()->month)
-        //         ->whereYear('created_at', Carbon::now()->year)
-        //         ->sum('total_amount') / 1000000
-        //     : Payroll::where('employee_id', $user->employee->id ?? 0)
-        //         ->whereMonth('created_at', Carbon::now()->month)
-        //         ->whereYear('created_at', Carbon::now()->year)
-        //         ->sum('total_amount') / 1000000;
-
-        $monthlyPayroll = $employees->sum('base_salary');
-
-
+        $activeEmployees = strtolower($user->role) !== 'employee' ? Employee::where('status', 'active')->get() : collect([Auth::user()->employee]);
+        $monthlyPayroll = $activeEmployees->sum('base_salary');
 
         // Payroll growth (admin/HR only)
         $payrollGrowth = strtolower($user->role) !== 'employee' ? $this->calculateGrowth(Payroll::class, 'created_at') : 0;
 
         // Payslips generated
         $payslipsGenerated = strtolower($user->role) !== 'employee'
-            ? Payslip::whereMonth('created_at', Carbon::now()->month)
+            ? Payroll::whereMonth('created_at', Carbon::now()->month)
                 ->whereYear('created_at', Carbon::now()->year)
                 ->count()
-            : Payslip::where('employee_id', $user->employee->id ?? 0)
+            : Payroll::where('employee_id', Auth::user()->employee->id ?? 0)
                 ->whereMonth('created_at', Carbon::now()->month)
                 ->whereYear('created_at', Carbon::now()->year)
                 ->count();
@@ -67,7 +55,7 @@ class DashboardController extends Controller
         try {
             if (class_exists(ComplianceTask::class) && Schema::hasTable('compliance_tasks')) {
                 $pendingTasks = strtolower($user->role) === 'employee'
-                    ? ComplianceTask::where('employee_id', $user->employee->id ?? 0)
+                    ? ComplianceTask::where('employee_id', Auth::user()->employee->id ?? 0)
                         ->where('status', 'Pending')
                         ->count()
                     : ComplianceTask::where('status', 'Pending')->count();
@@ -80,11 +68,28 @@ class DashboardController extends Controller
 
         // Recent payslips
         $recentPayslips = strtolower($user->role) === 'employee'
-            ? Payslip::with('employee')->where('employee_id', $user->employee->id ?? 0)->latest()->take(5)->get()
-            : Payslip::with('employee')->latest()->take(5)->get();
+            ? Payroll::with('employee')->where('employee_id', Auth::user()->employee->id ?? 0)->latest()->take(5)->get()
+            : Payroll::with('employee')->latest()->take(5)->get();
 
         // Employees list (admin/HR only)
-        $employees = strtolower($user->role) !== 'employee' ? Employee::with('user')->get() : collect([$user->employee]);
+        $employees = strtolower($user->role) !== 'employee' ? Employee::with('user')->get() : collect([Auth::user()->employee]);
+
+        // Prepare the employee data for CSV export
+        $employeesForExport = $employees->map(function($employee) {
+            return [
+                'id' => $employee->employee_id ?? '',
+                'name' => $employee->name ?? '',
+                'department' => $employee->department ?? '',
+                'position' => $employee->position ?? '',
+                'gross_salary' => ($employee->base_salary ?? 0) + ($employee->allowances ?? 0),
+                'status' => $employee->status ?? ''
+            ];
+        })->toArray();
+
+        // Fetch departments, banks, and compliance types
+        $departments = Department::all();
+        $banks = Bank::all();
+        $complianceTypes = ComplianceType::all();
 
         $chartLabels = $this->getChartLabels($user);
         $chartData = $this->getChartData($user);
@@ -93,7 +98,8 @@ class DashboardController extends Controller
         return view('dashboard.dashboard', compact(
             'totalEmployees', 'employeeGrowth', 'monthlyPayroll', 'payrollGrowth',
             'payslipsGenerated', 'pendingTasks', 'recentPayslips', 'employees',
-            'chartLabels', 'chartData', 'currentPeriod'
+            'employeesForExport',
+            'chartLabels', 'chartData', 'currentPeriod', 'departments', 'banks', 'complianceTypes'
         ));
     }
 
@@ -120,12 +126,10 @@ class DashboardController extends Controller
         return collect(range(5, -1, -1))->map(function ($month) use ($user) {
             $query = Payroll::whereMonth('created_at', Carbon::now()->subMonths($month)->month)
                 ->whereYear('created_at', Carbon::now()->subMonths($month)->year);
-
             if (strtolower($user->role) === 'employee') {
-                $query->where('employee_id', $user->employee->id ?? 0);
+                $query->where('employee_id', Auth::user()->employee->id ?? 0);
             }
-
-            return $query->sum('total_amount');
+            return $query->sum('total_amount') / 1000000; // Convert to millions for chart
         })->toArray();
     }
 }
