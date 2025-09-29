@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Notifications\Notifiable;
 
 class Employee extends Model implements AuthenticatableContract
 {
-    use Authenticatable, SoftDeletes;
+    use Authenticatable, SoftDeletes, Notifiable;
 
     protected $guarded = [];
 
@@ -20,7 +21,134 @@ class Employee extends Model implements AuthenticatableContract
         'base_salary' => 'decimal:2',
         'allowances' => 'decimal:2',
         'deductions' => 'decimal:2',
+        'last_login_at' => 'datetime',
+        'last_logout_at' => 'datetime',
+        'email_verified_at' => 'datetime',
+        'auto_logout' => 'boolean',
     ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected $fillable = [
+        'employee_id',
+        'name',
+        'email',
+        'password',
+        'remember_token',
+        'email_verified_at',
+        'department',
+        'role',
+        'position',
+        'base_salary',
+        'allowances',
+        'deductions',
+        'status',
+        'gender',
+        'dob',
+        'nationality',
+        'phone',
+        'address',
+        'hire_date',
+        'contract_end_date',
+        'bank_name',
+        'account_number',
+        'employment_type',
+        'nssf_number',
+        'nhif_number',
+        'tin_number',
+        'last_login_at',
+        'last_login_ip',
+        'last_logout_at',
+        'auto_logout',
+        'password_changed_at',
+    ];
+
+    /**
+     * Get the name of the unique identifier for the user.
+     *
+     * @return string
+     */
+    public function getAuthIdentifierName()
+    {
+        return 'id';
+    }
+
+    /**
+     * Get the unique identifier for the user.
+     *
+     * @return mixed
+     */
+    public function getAuthIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    /**
+     * Get the password for the user.
+     *
+     * @return string
+     */
+    public function getAuthPassword()
+    {
+        return $this->password;
+    }
+
+    /**
+     * Get the token value for the "remember me" session.
+     *
+     * @return string|null
+     */
+    public function getRememberToken()
+    {
+        return $this->remember_token;
+    }
+
+    /**
+     * Set the token value for the "remember me" session.
+     *
+     * @param  string|null  $value
+     * @return void
+     */
+    public function setRememberToken($value)
+    {
+        $this->remember_token = $value;
+    }
+
+    /**
+     * Get the column name for the "remember me" token.
+     *
+     * @return string
+     */
+    public function getRememberTokenName()
+    {
+        return 'remember_token';
+    }
+
+    /**
+     * Get the e-mail address where password reset links are sent.
+     *
+     * @return string
+     */
+    public function getEmailForPasswordReset()
+    {
+        return $this->email;
+    }
+
+    /**
+     * Send the password reset notification.
+     *
+     * @param  string  $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        // You can implement email sending here if needed
+        // For now, we'll just log it
+        \Log::info("Password reset requested for {$this->email}. Token: {$token}");
+    }
 
     // FIX: Relationship ya allowances
     public function allowances()
@@ -100,5 +228,155 @@ class Employee extends Model implements AuthenticatableContract
     public function updatedSettings()
     {
         return $this->hasMany(Setting::class, 'updated_by', 'employee_id');
+    }
+
+    /**
+     * Check if user has a specific role
+     */
+    public function hasRole($role)
+    {
+        return strtolower($this->role) === strtolower($role);
+    }
+
+    /**
+     * Check if user has any of the given roles
+     */
+    public function hasAnyRole(array $roles)
+    {
+        return in_array(strtolower($this->role), array_map('strtolower', $roles));
+    }
+
+    /**
+     * Check if user is admin
+     */
+    public function isAdmin()
+    {
+        return $this->hasRole('admin');
+    }
+
+    /**
+     * Check if user is HR
+     */
+    public function isHR()
+    {
+        return $this->hasRole('hr');
+    }
+
+    /**
+     * Check if user is manager
+     */
+    public function isManager()
+    {
+        return $this->hasRole('manager');
+    }
+
+    /**
+     * Check if user is employee
+     */
+    public function isEmployee()
+    {
+        return $this->hasRole('employee');
+    }
+
+    /**
+     * Check if user account is active
+     */
+    public function isActive()
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Update last login information
+     */
+    public function updateLastLogin($ipAddress = null)
+    {
+        $this->update([
+            'last_login_at' => now(),
+            'last_login_ip' => $ipAddress
+        ]);
+    }
+
+    /**
+     * Update last logout information
+     */
+    public function updateLastLogout($autoLogout = false)
+    {
+        $this->update([
+            'last_logout_at' => now(),
+            'auto_logout' => $autoLogout
+        ]);
+    }
+
+    /**
+     * Update password change timestamp
+     */
+    public function updatePasswordChangedAt()
+    {
+        $this->update([
+            'password_changed_at' => now()
+        ]);
+    }
+
+    /**
+     * Scope for active employees
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
+    /**
+     * Scope for employees by role
+     */
+    public function scopeByRole($query, $role)
+    {
+        return $query->where('role', $role);
+    }
+
+    /**
+     * Scope for employees by department
+     */
+    public function scopeByDepartment($query, $department)
+    {
+        return $query->where('department', $department);
+    }
+
+    /**
+     * Get formatted salary
+     */
+    public function getFormattedSalaryAttribute()
+    {
+        return 'TZS ' . number_format($this->base_salary, 2);
+    }
+
+    /**
+     * Get formatted net salary
+     */
+    public function getFormattedNetSalaryAttribute()
+    {
+        $netSalary = $this->base_salary + ($this->allowances ?? 0) - ($this->deductions ?? 0);
+        return 'TZS ' . number_format($netSalary, 2);
+    }
+
+    /**
+     * Get employee's full profile
+     */
+    public function getProfileAttribute()
+    {
+        return [
+            'employee_id' => $this->employee_id,
+            'name' => $this->name,
+            'email' => $this->email,
+            'department' => $this->department,
+            'position' => $this->position,
+            'role' => $this->role,
+            'status' => $this->status,
+            'salary' => $this->formatted_salary,
+            'net_salary' => $this->formatted_net_salary,
+            'employment_type' => $this->employment_type,
+            'hire_date' => $this->hire_date?->format('Y-m-d'),
+            'last_login' => $this->last_login_at?->format('Y-m-d H:i:s'),
+        ];
     }
 }

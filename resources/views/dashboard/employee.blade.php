@@ -30,77 +30,25 @@
         </div>
     @endif
 
-    <!-- Quick Actions -->
-    <div class="mb-8">
-        <h3 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
-            <i class="fas fa-bolt text-green-500 mr-2"></i> Quick Actions
+    <!-- Header with Export and Bulk Import Buttons -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <h3 class="text-lg font-medium text-gray-700 flex items-center">
+            <i class="fas fa-users text-green-500 mr-2"></i> Employee List
+            <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $employees->total() }} employees</span>
         </h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-green-50 hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('bulkImportModal')">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                        <i class="fas fa-upload text-green-600 text-lg"></i>
-                    </div>
-                    <div>
-                        <div class="font-medium text-gray-900">Bulk Import</div>
-                        <div class="text-sm text-gray-500">Import multiple employees</div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-green-50 hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="exportEmployees()">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                        <i class="fas fa-download text-green-600 text-lg"></i>
-                    </div>
-                    <div>
-                        <div class="font-medium text-gray-900">Export Employees</div>
-                        <div class="text-sm text-gray-500">Download employee data</div>
-                    </div>
-                </div>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-green-50 hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('templateInstructionsModal')">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                        <i class="fas fa-file-download text-green-600 text-lg"></i>
-                    </div>
-                    <div>
-                        <div class="font-medium text-gray-900">Download Template</div>
-                        <div class="text-sm text-gray-500">Get import template</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filter Section -->
-    <div class="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm p-4" id="filterSection">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <h3 class="text-lg font-medium text-gray-700 flex items-center">
-                <i class="fas fa-filter text-green-500 mr-2"></i> Filter Employees
-            </h3>
-            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                <div class="relative w-full sm:w-64">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400"></i>
-                    </div>
-                    <input type="text" id="searchEmployee" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="Search by name, email, or ID..." value="{{ $search ?? '' }}">
-                </div>
-                <select id="departmentFilter" class="bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 py-2 px-3 text-sm w-full sm:w-48">
-                    <option value="">All Departments</option>
-                    @foreach($departments as $department)
-                        <option value="{{ strtolower($department->name) }}" {{ $request->input('department') == strtolower($department->name) ? 'selected' : '' }}>{{ $department->name }}</option>
-                    @endforeach
-                </select>
-                <select id="statusFilter" class="bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 py-2 px-3 text-sm w-full sm:w-48">
-                    <option value="">All Status</option>
-                    <option value="active" {{ $request->input('status') == 'active' ? 'selected' : '' }}>Active</option>
-                    <option value="inactive" {{ $request->input('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
-                    <option value="terminated" {{ $request->input('status') == 'terminated' ? 'selected' : '' }}>Terminated</option>
-                </select>
-                <button onclick="clearFilters()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-all duration-200 flex items-center justify-center">
-                    <i class="fas fa-times mr-2"></i> Clear Filters
-                </button>
-            </div>
+        
+        <div class="flex items-center space-x-3">
+            <!-- Bulk Import Button -->
+            <button onclick="openModal('bulkImportModal')" 
+                    class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center">
+                <i class="fas fa-upload mr-2"></i> Bulk Import
+            </button>
+            
+            <!-- Export Button -->
+            <button onclick="exportEmployees()" 
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center">
+                <i class="fas fa-download mr-2"></i> Export
+            </button>
         </div>
     </div>
 
@@ -119,11 +67,36 @@
     <!-- Employees Table Container -->
     <div id="employeesTableContainer" class="block">
         @fragment('employeesTable')
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h3 class="text-lg font-medium text-gray-700 flex items-center">
-                <i class="fas fa-users text-green-500 mr-2"></i> Employee List
-                <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $employees->total() }} employees</span>
-            </h3>
+        <!-- Filter Section -->
+        <div class="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm p-4" id="filterSection">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                    <i class="fas fa-filter text-green-500 mr-2"></i> Filter Employees
+                </h3>
+                <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div class="relative w-full sm:w-64">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input type="text" id="searchEmployee" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="Search by name, email, or ID..." value="{{ $search ?? '' }}">
+                    </div>
+                    <select id="departmentFilter" class="bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 py-2 px-3 text-sm w-full sm:w-48">
+                        <option value="">All Departments</option>
+                        @foreach($departments as $department)
+                            <option value="{{ strtolower($department->name) }}" {{ $request->input('department') == strtolower($department->name) ? 'selected' : '' }}>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                    <select id="statusFilter" class="bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 py-2 px-3 text-sm w-full sm:w-48">
+                        <option value="">All Status</option>
+                        <option value="active" {{ $request->input('status') == 'active' ? 'selected' : '' }}>Active</option>
+                        <option value="inactive" {{ $request->input('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                        <option value="terminated" {{ $request->input('status') == 'terminated' ? 'selected' : '' }}>Terminated</option>
+                    </select>
+                    <button onclick="clearFilters()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-all duration-200 flex items-center justify-center">
+                        <i class="fas fa-times mr-2"></i> Clear Filters
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Table Container -->
@@ -212,8 +185,7 @@
         </div>
         @endfragment
     </div>
-
-    <!-- Add Employee Form -->
+        <!-- Add Employee Form -->
     <div id="addEmployeeFormContainer" class="hidden">
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <h3 class="text-lg font-medium text-gray-700 mb-4">Add New Employee</h3>
@@ -306,21 +278,33 @@
                             </select>
                         </div>
                     </div>
+                    <!-- Salary Information -->
                     <div class="space-y-4 col-span-1 md:col-span-2">
                         <h4 class="text-lg font-medium text-gray-700 border-b pb-2">Salary Information</h4>
                         <div>
                             <label class="block text-gray-600 text-sm font-medium mb-2">Base Salary (TZS) *</label>
-                            <input type="number" name="base_salary" step="0.01" min="0" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            <input type="number" name="base_salary" step="0.01" min="0" required 
+                                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                         </div>
                         <div>
                             <label class="block text-gray-600 text-sm font-medium mb-2">Allowances</label>
-                            <div class="space-y-2">
+                            <select name="allowances[]" multiple 
+                                    class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm">
                                 @foreach($allowances as $allowance)
-                                    <label class="flex items-center">
-                                        <input type="checkbox" name="allowances[]" value="{{ $allowance->id }}" class="mr-2">
-                                        <span>{{ $allowance->name }} (TZS {{ number_format($allowance->amount, 0) }})</span>
-                                    </label>
+                                    <option value="{{ $allowance->id }}">
+                                        {{ $allowance->name }} (TZS {{ number_format($allowance->amount, 0) }})
+                                    </option>
                                 @endforeach
+                            </select>
+                            <p class="text-sm text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple allowances</p>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div class="flex items-start">
+                                <i class="fas fa-info-circle text-blue-500 mt-1 mr-2"></i>
+                                <div class="text-sm text-blue-700">
+                                    <strong>Note:</strong> Selected allowances will be automatically added to the employee's total salary. 
+                                    If no allowances are selected, the base salary will be used as the total salary.
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -365,210 +349,160 @@
         </div>
     </div>
 
-    <!-- Template Instructions Modal -->
-    <div id="templateInstructionsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-lg w-full max-w-4xl transform transition-all duration-300 scale-95 modal-content">
-            <div class="p-6 bg-green-50 border-b border-green-200">
-                <h3 class="text-xl font-semibold text-green-600 flex items-center">
-                    <i class="fas fa-file-download mr-2"></i> Import Template Instructions
-                </h3>
-                <button type="button" onclick="closeModal('templateInstructionsModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition-all duration-200" aria-label="Close template instructions modal">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <div class="p-6 max-h-[70vh] overflow-y-auto">
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                    <div class="flex items-start">
-                        <i class="fas fa-info-circle text-blue-500 text-lg mt-1 mr-3"></i>
-                        <div>
-                            <h4 class="font-medium text-blue-800 mb-1">Important Notes</h4>
-                            <p class="text-blue-700 text-sm">The template is an Excel sheet for bulk importing employees. Fill in the following columns carefully to ensure successful import.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                        <h4 class="text-lg font-medium text-gray-800 mb-3">Required Fields</h4>
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">name</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">email</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">department</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">position</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">employment_type</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">hire_date</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">base_salary</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">role</span>
-                                <span class="text-red-500 text-sm font-medium">Required</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 class="text-lg font-medium text-gray-800 mb-3">Optional Fields</h4>
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">phone</span>
-                                <span class="text-green-500 text-sm font-medium">Optional</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">gender</span>
-                                <span class="text-green-500 text-sm font-medium">Optional</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">dob</span>
-                                <span class="text-green-500 text-sm font-medium">Optional</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">nationality</span>
-                                <span class="text-green-500 text-sm font-medium">Optional</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">address</span>
-                                <span class="text-green-500 text-sm font-medium">Optional</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">bank_name</span>
-                                <span class="text-green-500 text-sm font-medium">Optional</span>
-                            </div>
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <span class="font-medium text-gray-700">account_number</span>
-                                <span class="text-green-500 text-sm font-medium">Optional</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div class="flex items-start">
-                        <i class="fas fa-exclamation-triangle text-yellow-500 text-lg mt-1 mr-3"></i>
-                        <div>
-                            <h4 class="font-medium text-yellow-800 mb-1">Special Notes</h4>
-                            <ul class="text-yellow-700 text-sm space-y-1">
-                                <li>• Employee ID is generated automatically during import</li>
-                                <li>• For contract employees, contract_end_date is required</li>
-                                <li>• Date formats should be YYYY-MM-DD (e.g., 2023-01-15)</li>
-                                <li>• Department names must exist in the system</li>
-                                <li>• Role slugs must exist in the roles table</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end space-x-3">
-                <button type="button" onclick="closeModal('templateInstructionsModal')" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200">
-                    Close
-                </button>
-                <a href="{{ route('employees.download-template') }}" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center">
-                    <i class="fas fa-download mr-2"></i> Download Template
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bulk Import Modal with Drag & Drop -->
+    <!-- Redesigned Bulk Import Modal -->
     <div id="bulkImportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-lg w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
-            <div class="p-6 bg-green-50 border-b border-green-200">
-                <h3 class="text-xl font-semibold text-green-600 flex items-center">
-                    <i class="fas fa-upload mr-2"></i> Bulk Import Employees
-                </h3>
-                <button type="button" onclick="closeModal('bulkImportModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition-all duration-200" aria-label="Close bulk import modal">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
+        <div class="bg-white rounded-xl w-full max-w-4xl transform transition-all duration-300 scale-95 modal-content shadow-2xl">
+            <!-- Modal Header -->
+            <div class="p-6 bg-gradient-to-r from-green-500 to-green-600 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-upload text-white text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-white">Bulk Import Employees</h3>
+                            <p class="text-green-100 text-sm">Upload Excel file to import multiple employees at once</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeModal('bulkImportModal')" class="text-white hover:text-green-100 rounded-full p-2 hover:bg-white hover:bg-opacity-10 transition-all duration-200">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
             </div>
+
             <div class="p-6">
-                <form id="bulkImportForm" action="{{ route('employees.bulk-import') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
-                    @csrf
-                    
-                    <!-- Drag & Drop Area -->
-                    <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center transition-all duration-300 hover:border-green-400 hover:bg-green-50">
-                        <div class="flex flex-col items-center justify-center space-y-4">
-                            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                                <i class="fas fa-cloud-upload-alt text-green-500 text-2xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-lg font-medium text-gray-700 mb-1">Drop your file here</p>
-                                <p class="text-sm text-gray-500">or click to browse</p>
-                            </div>
-                            <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" class="hidden" required>
-                            <button type="button" onclick="document.getElementById('fileInput').click()" class="px-6 py-2 text-sm font-medium text-green-600 bg-green-100 rounded-lg hover:bg-green-200 transition-all duration-200">
-                                Choose File
-                            </button>
-                        </div>
+                <!-- Step Progress -->
+                <div class="flex items-center justify-center mb-8">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</div>
+                        <div class="w-24 h-1 bg-green-500 mx-2"></div>
+                        <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</div>
+                        <div class="w-24 h-1 bg-green-500 mx-2"></div>
+                        <div class="w-8 h-8 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-sm font-bold">3</div>
                     </div>
+                </div>
 
-                    <!-- File Info -->
-                    <div id="fileInfo" class="hidden bg-gray-50 rounded-lg p-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <i class="fas fa-file-excel text-green-500 text-xl"></i>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Left Column: Instructions & Template Download -->
+                    <div class="space-y-6">
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                            <div class="flex items-start space-x-3">
+                                <i class="fas fa-info-circle text-blue-500 text-xl mt-1"></i>
                                 <div>
-                                    <p id="fileName" class="font-medium text-gray-800"></p>
-                                    <p id="fileSize" class="text-sm text-gray-500"></p>
+                                    <h4 class="font-semibold text-blue-800 mb-2">Before You Import</h4>
+                                    <ul class="text-blue-700 text-sm space-y-2">
+                                        <li class="flex items-start">
+                                            <i class="fas fa-check-circle text-blue-500 mt-1 mr-2 text-xs"></i>
+                                            <span>Download and use our template to ensure proper formatting</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fas fa-check-circle text-blue-500 mt-1 mr-2 text-xs"></i>
+                                            <span>Required fields must be filled for each employee</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <i class="fas fa-check-circle text-blue-500 mt-1 mr-2 text-xs"></i>
+                                            <span>Email addresses must be unique across the system</span>
+                                        </li>
+                                    </ul>
                                 </div>
                             </div>
-                            <button type="button" onclick="removeFile()" class="text-red-500 hover:text-red-700">
-                                <i class="fas fa-times"></i>
-                            </button>
+                        </div>
+
+                        <!-- Template Download Card -->
+                        <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-5">
+                            <div class="flex items-center space-x-3 mb-4">
+                                <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-file-download text-purple-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-purple-800">Download Template</h4>
+                                    <p class="text-purple-600 text-sm">Get the pre-formatted Excel template</p>
+                                </div>
+                            </div>
+                            <a href="{{ route('employees.download-template') }}" 
+                               class="w-full bg-white border border-purple-300 text-purple-700 rounded-lg py-3 px-4 hover:bg-purple-50 transition-all duration-200 flex items-center justify-center space-x-2 font-medium">
+                                <i class="fas fa-download"></i>
+                                <span>Download Excel Template</span>
+                            </a>
+                        </div>
+
+                        <!-- Supported Formats -->
+                        <div class="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                            <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                                <i class="fas fa-file-excel text-green-600 mr-2"></i>
+                                Supported Formats
+                            </h4>
+                            <div class="grid grid-cols-3 gap-2">
+                                <div class="text-center p-2 bg-white rounded-lg border">
+                                    <div class="text-green-600 font-bold text-sm">XLSX</div>
+                                </div>
+                                <div class="text-center p-2 bg-white rounded-lg border">
+                                    <div class="text-green-600 font-bold text-sm">XLS</div>
+                                </div>
+                                <div class="text-center p-2 bg-white rounded-lg border">
+                                    <div class="text-green-600 font-bold text-sm">CSV</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Supported Formats -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div class="flex items-start">
-                            <i class="fas fa-info-circle text-blue-500 text-lg mt-1 mr-3"></i>
-                            <div>
-                                <h4 class="font-medium text-blue-800 mb-1">Supported Formats</h4>
-                                <div class="flex flex-wrap gap-2 mt-2">
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-700 border border-blue-200">
-                                        <i class="fas fa-file-excel mr-1.5"></i> XLSX
-                                    </span>
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-700 border border-blue-200">
-                                        <i class="fas fa-file-excel mr-1.5"></i> XLS
-                                    </span>
-                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-700 border border-blue-200">
-                                        <i class="fas fa-file-csv mr-1.5"></i> CSV
-                                    </span>
+                    <!-- Right Column: File Upload -->
+                    <div class="space-y-6">
+                        <form id="bulkImportForm" action="{{ route('employees.bulk-import') }}" method="POST" enctype="multipart/form-data">
+                            @csrf
+                            
+                            <!-- Drag & Drop Area -->
+                            <div id="dropZone" class="border-3 border-dashed border-green-300 rounded-2xl p-8 text-center transition-all duration-300 bg-green-50 hover:bg-green-100 hover:border-green-400 cursor-pointer">
+                                <div class="flex flex-col items-center justify-center space-y-4">
+                                    <div class="w-20 h-20 bg-green-200 rounded-full flex items-center justify-center">
+                                        <i class="fas fa-cloud-upload-alt text-green-600 text-3xl"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-xl font-semibold text-gray-700 mb-2">Drop your file here</p>
+                                        <p class="text-gray-500">or <span class="text-green-600 font-medium">click to browse</span></p>
+                                    </div>
+                                    <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" class="hidden" required>
+                                    <button type="button" onclick="document.getElementById('fileInput').click()" 
+                                            class="px-6 py-3 text-sm font-medium text-green-600 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-all duration-200 shadow-sm">
+                                        Choose File from Computer
+                                    </button>
                                 </div>
                             </div>
-                        </div>
+
+                            <!-- File Info -->
+                            <div id="fileInfo" class="hidden bg-white border border-green-200 rounded-xl p-4 shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                            <i class="fas fa-file-excel text-green-600 text-xl"></i>
+                                        </div>
+                                        <div>
+                                            <p id="fileName" class="font-semibold text-gray-800"></p>
+                                            <p id="fileSize" class="text-sm text-gray-500"></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="removeFile()" 
+                                            class="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-all duration-200">
+                                        <i class="fas fa-times text-lg"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-3 flex items-center text-green-600 text-sm">
+                                    <i class="fas fa-check-circle mr-2"></i>
+                                    <span>File ready for import</span>
+                                </div>
+                            </div>
+
+                            <!-- Import Button -->
+                            <button type="submit" id="importButton" 
+                                    class="w-full hidden bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl py-4 px-6 font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                                <div class="flex items-center justify-center space-x-3">
+                                    <i class="fas fa-rocket text-lg"></i>
+                                    <span>Import Employees</span>
+                                </div>
+                            </button>
+                        </form>
                     </div>
-                </form>
-            </div>
-            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end space-x-3">
-                <button type="button" onclick="closeModal('bulkImportModal')" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200">
-                    Cancel
-                </button>
-                <button type="submit" form="bulkImportForm" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center">
-                    <i class="fas fa-upload mr-2"></i> Import Employees
-                </button>
+                </div>
             </div>
         </div>
     </div>
@@ -656,8 +590,7 @@
             </div>
         </div>
     </div>
-
-    <!-- JavaScript -->
+        <!-- JavaScript -->
     <script>
         // Modal Functions
         function openModal(modalId) {
@@ -688,13 +621,14 @@
             }
         }
 
-        // Drag & Drop Functionality
+        // Updated Drag & Drop Functionality for New Modal
         function initializeDragAndDrop() {
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
             const fileInfo = document.getElementById('fileInfo');
             const fileName = document.getElementById('fileName');
             const fileSize = document.getElementById('fileSize');
+            const importButton = document.getElementById('importButton');
 
             // Prevent default drag behaviors
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -723,11 +657,11 @@
             }
 
             function highlight() {
-                dropZone.classList.add('border-green-400', 'bg-green-50');
+                dropZone.classList.add('border-green-400', 'bg-green-100');
             }
 
             function unhighlight() {
-                dropZone.classList.remove('border-green-400', 'bg-green-50');
+                dropZone.classList.remove('border-green-400', 'bg-green-100');
             }
 
             function handleDrop(e) {
@@ -770,6 +704,7 @@
                 fileSize.textContent = formatFileSize(file.size);
                 fileInfo.classList.remove('hidden');
                 dropZone.classList.add('hidden');
+                importButton.classList.remove('hidden');
             }
 
             function formatFileSize(bytes) {
@@ -785,10 +720,12 @@
             const fileInput = document.getElementById('fileInput');
             const fileInfo = document.getElementById('fileInfo');
             const dropZone = document.getElementById('dropZone');
+            const importButton = document.getElementById('importButton');
             
             fileInput.value = '';
             fileInfo.classList.add('hidden');
             dropZone.classList.remove('hidden');
+            importButton.classList.add('hidden');
         }
 
         // Tab Switching
@@ -913,10 +850,6 @@
         // Quick Actions Functions
         function exportEmployees() {
             window.location.href = '{{ route('employees.export') }}';
-        }
-
-        function downloadTemplate() {
-            openModal('templateInstructionsModal');
         }
 
         // Handle Employment Type Change
@@ -1081,6 +1014,28 @@
 
             // Initialize drag and drop
             initializeDragAndDrop();
+            initializeMultipleSelects();
+
+            // Handle bulk import form submission
+            const bulkImportForm = document.getElementById('bulkImportForm');
+            if (bulkImportForm) {
+                bulkImportForm.addEventListener('submit', function(e) {
+                    const fileInput = document.getElementById('fileInput');
+                    if (!fileInput.files.length) {
+                        e.preventDefault();
+                        showErrorModal('Please select a file to import.');
+                        return;
+                    }
+                    
+                    // Show loading state
+                    const submitBtn = bulkImportForm.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing...';
+                    submitBtn.disabled = true;
+                    
+                    // Form will submit normally
+                });
+            }
 
             if (addForm) {
                 addForm.addEventListener('submit', function(e) {
@@ -1120,5 +1075,29 @@
                 }
             });
         });
+
+        function initializeMultipleSelects() {
+            const allowanceSelects = document.querySelectorAll('select[name="allowances[]"]');
+            allowanceSelects.forEach(select => {
+                // Add search functionality
+                const searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.placeholder = 'Search allowances...';
+                searchInput.className = 'w-full px-3 py-2 border border-gray-300 rounded-md mb-2';
+                searchInput.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.toLowerCase();
+                    Array.from(select.options).forEach(option => {
+                        if (option.value === '') return;
+                        const text = option.text.toLowerCase();
+                        option.style.display = text.includes(searchTerm) ? '' : 'none';
+                    });
+                });
+                
+                select.parentNode.insertBefore(searchInput, select);
+                
+                // Style the multiple select
+                select.style.minHeight = '120px';
+            });
+        }
     </script>
 @endsection

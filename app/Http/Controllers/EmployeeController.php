@@ -13,11 +13,18 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+
+// Excel Imports/Exports
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\EmployeesImport;
 use App\Exports\EmployeesExport;
+
+// PhpSpreadsheet for Template Download
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Color;
+
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -31,28 +38,25 @@ class EmployeeController extends Controller
      */
     public function index(Request $request)
     {
-        $user = Auth::user();
-        if (!$user) {
+        $userRole = Auth::user();
+        if (!$userRole) {
             Log::warning('User not authenticated.');
-            return redirect('/login')->with('error', 'Please log in.');
+            return redirect('/')->with('error', 'Please log in.');
         }
-
-        // Determine user role for access control
-        $userRole = strtolower($user->role ?? 'employee');
 
         // Handle search and filtering parameters
         $search = $request->input('search', '');
         $department = $request->input('department', '');
         $status = $request->input('status', '');
-        $sort = $request->input('sort', 'name');
-        $direction = $request->input('direction', 'asc');
+        $sort = $request->input('sort', 'created_at'); // Default sort by created_at
+        $direction = $request->input('direction', 'desc'); // Default descending
 
-        // Validate sort column to prevent SQL injection
-        $validSortColumns = ['name', 'position', 'department', 'base_salary'];
-        $sort = in_array($sort, $validSortColumns) ? $sort : 'name';
-        $direction = in_array($direction, ['asc', 'desc']) ? $direction : 'asc';
+        // Validate sort column
+        $validSortColumns = ['name', 'position', 'department', 'base_salary', 'created_at', 'employee_id'];
+        $sort = in_array($sort, $validSortColumns) ? $sort : 'created_at';
+        $direction = in_array($direction, ['asc', 'desc']) ? $direction : 'desc';
 
-        // Fetch paginated employee records with eager loading and filters
+        // Fetch paginated employee records
         $query = Employee::with('departmentRel', 'allowances');
 
         // Apply search filter
@@ -77,128 +81,21 @@ class EmployeeController extends Controller
 
         $employees = $query->orderBy($sort, $direction)->paginate(15);
 
-        // Data for Dashboard/Widgets
+        // Rest of your existing code remains the same...
         $totalEmployees = Employee::count();
         $activeEmployeeCount = Employee::where('status', 'active')->count();
         $employeeGrowth = $this->calculateGrowth(Employee::class, 'hire_date');
         $complianceTasksDue = ComplianceTask::whereDate('due_date', '<=', Carbon::now()->addDays(7))->count();
         $currentPeriod = Carbon::now()->format('F Y');
 
-        // Fetch supporting data for frontend dropdowns/forms
         $departments = Department::all();
         $banks = Bank::all();
         $allowances = Allowance::where('active', 1)->get();
         $roles = Role::all();
 
+        // AJAX response remains the same...
         if ($request->ajax()) {
-            // Return table HTML directly for AJAX requests
-            ob_start();
-            ?>
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                <h3 class="text-lg font-medium text-gray-700 flex items-center">
-                    <i class="fas fa-users text-green-500 mr-2"></i> Employee List
-                    <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $employees->total() }} employees</span>
-                </h3>
-            </div>
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="bg-gray-50 text-gray-700 text-sm">
-                                <th class="py-3.5 px-6 text-left font-semibold cursor-pointer" onclick="sortTable('name')" data-sort-column="name" data-sort-direction="{{ $request->input('direction', 'asc') }}">
-                                    <div class="flex items-center space-x-1">
-                                        <span>Employee</span>
-                                        <i class="fas fa-sort text-gray-400"></i>
-                                    </div>
-                                </th>
-                                <th class="py-3.5 px-6 text-left font-semibold cursor-pointer" onclick="sortTable('position')" data-sort-column="position" data-sort-direction="{{ $request->input('direction', 'asc') }}">
-                                    <div class="flex items-center space-x-1">
-                                        <span>Position</span>
-                                        <i class="fas fa-sort text-gray-400"></i>
-                                    </div>
-                                </th>
-                                <th class="py-3.5 px-6 text-left font-semibold cursor-pointer" onclick="sortTable('department')" data-sort-column="department" data-sort-direction="{{ $request->input('direction', 'asc') }}">
-                                    <div class="flex items-center space-x-1">
-                                        <span>Department</span>
-                                        <i class="fas fa-sort text-gray-400"></i>
-                                    </div>
-                                </th>
-                                <th class="py-3.5 px-6 text-left font-semibold cursor-pointer" onclick="sortTable('base_salary')" data-sort-column="base_salary" data-sort-direction="{{ $request->input('direction', 'asc') }}">
-                                    <div class="flex items-center space-x-1">
-                                        <span>Salary</span>
-                                        <i class="fas fa-sort text-gray-400"></i>
-                                    </div>
-                                </th>
-                                <th class="py-3.5 px-6 text-left font-semibold">Status</th>
-                                <th class="py-3.5 px-6 text-left font-semibold">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="employeesTableBody" class="divide-y divide-gray-100">
-                            <?php foreach ($employees as $employee): ?>
-                                <?php
-                                    $statusColors = [
-                                        'active' => 'bg-green-100 text-green-800',
-                                        'inactive' => 'bg-red-100 text-red-800',
-                                        'terminated' => 'bg-gray-100 text-gray-800'
-                                    ];
-                                    $statusColor = $statusColors[$employee->status ?? 'active'] ?? 'bg-gray-100 text-gray-800';
-                                ?>
-                                <tr class="bg-white hover:bg-gray-50 transition-all duration-200 employee-row"
-                                    data-name="<?php echo strtolower($employee->name); ?>"
-                                    data-email="<?php echo strtolower($employee->email); ?>"
-                                    data-employee-id="<?php echo strtolower($employee->employee_id); ?>"
-                                    data-department="<?php echo strtolower($employee->department); ?>"
-                                    data-status="<?php echo strtolower($employee->status); ?>"
-                                    data-position="<?php echo strtolower($employee->position); ?>">
-                                    <td class="py-4 px-6">
-                                        <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                                                <span class="font-medium text-green-800"><?php echo substr($employee->name, 0, 1); ?></span>
-                                            </div>
-                                            <div>
-                                                <div class="font-medium text-gray-900"><?php echo $employee->name; ?></div>
-                                                <div class="text-sm text-gray-500"><?php echo $employee->email; ?></div>
-                                                <div class="text-xs text-gray-400"><?php echo $employee->employee_id; ?></div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="py-4 px-6 text-sm text-gray-900"><?php echo $employee->position ?? 'N/A'; ?></td>
-                                    <td class="py-4 px-6">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            <?php echo $employee->departmentRel->name ?? $employee->department ?? 'N/A'; ?>
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6 text-sm font-medium text-gray-900">TZS <?php echo number_format($employee->base_salary, 0); ?></td>
-                                    <td class="py-4 px-6">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <?php echo $statusColor; ?>">
-                                            <i class="fas fa-circle mr-1" style="font-size: 6px;"></i>
-                                            <?php echo ucfirst($employee->status); ?>
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6">
-                                        <div class="flex space-x-2">
-                                            <button onclick="viewEmployeeDetails('<?php echo $employee->employee_id; ?>')" class="text-blue-600 hover:text-blue-800" title="View Details">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button onclick="editEmployee('<?php echo $employee->employee_id; ?>')" class="text-green-600 hover:text-green-800" title="Edit Employee">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button onclick="toggleStatus('<?php echo $employee->employee_id; ?>', '<?php echo $employee->status; ?>')" class="text-gray-600 hover:text-gray-800" title="<?php echo $employee->status === 'active' ? 'Deactivate' : 'Activate'; ?> Employee">
-                                                <i class="fas <?php echo $employee->status === 'active' ? 'fa-power-off' : 'fa-play'; ?>"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="p-4" id="paginationContainer">
-                    <?php echo $employees->links(); ?>
-                </div>
-            </div>
-            <?php
-            return ob_get_clean();
+            return $this->getEmployeesTableHtml($employees, $request);
         }
 
         return view('dashboard.employee', compact(
@@ -220,148 +117,6 @@ class EmployeeController extends Controller
         ));
     }
 
-public function store(Request $request)
-{
-    \Log::info('=== EMPLOYEE STORE START ===');
-    \Log::info('Request Data:', $request->all());
-
-    // Check what data exists in database
-    $departments = Department::pluck('id', 'name')->toArray();
-    $roles = Role::pluck('slug', 'name')->toArray();
-    
-    \Log::info('Available Departments:', $departments);
-    \Log::info('Available Roles:', $roles);
-
-    // Validation rahisi sana - ondoa validation ngumu
-    $rules = [
-        'name' => 'required',
-        'email' => 'required|email',
-        'position' => 'required',
-        'department' => 'required',
-        'base_salary' => 'required|numeric',
-        'hire_date' => 'required|date',
-        'employment_type' => 'required',
-        'role' => 'required',
-        'status' => 'required',
-    ];
-
-    $validator = Validator::make($request->all(), $rules);
-
-    if ($validator->fails()) {
-        $errors = $validator->errors()->all();
-        \Log::error('VALIDATION ERRORS:', $errors);
-        
-        return redirect()->back()
-            ->withErrors($validator)
-            ->with('error', 'Validation errors: ' . implode(', ', $errors))
-            ->withInput();
-    }
-
-    // Check if email already exists
-    if (Employee::where('email', $request->email)->exists()) {
-        \Log::error('Email already exists: ' . $request->email);
-        return redirect()->back()
-            ->with('error', 'Email already registered: ' . $request->email)
-            ->withInput();
-    }
-
-    try {
-        DB::beginTransaction();
-
-        // Generate Employee ID
-        $employeeId = "EMP-" . strtoupper(Str::random(8));
-        
-        // Generate Password
-        $nameParts = explode(' ', trim($request->name));
-        $lastName = end($nameParts);
-        $initialPassword = strtolower($lastName ?: 'employee123');
-        $password = Hash::make($initialPassword);
-
-        // Create employee
-        $employeeData = [
-            'employee_id' => $employeeId,
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => $password,
-            'department' => $request->department,
-            'position' => $request->position,
-            'role' => $request->role,
-            'base_salary' => $request->base_salary,
-            'employment_type' => $request->employment_type,
-            'hire_date' => $request->hire_date,
-            'status' => $request->status,
-            'allowances' => 0.00,
-            'deductions' => 0.00,
-        ];
-
-        // Add optional fields kama zipo
-        $optionalFields = ['phone', 'gender', 'dob', 'nationality', 'address', 'contract_end_date', 
-                          'bank_name', 'account_number', 'nssf_number', 'tin_number', 'nhif_number'];
-        
-        foreach ($optionalFields as $field) {
-            if ($request->has($field) && !empty($request->$field)) {
-                $employeeData[$field] = $request->$field;
-            }
-        }
-
-        \Log::info('Final Employee Data:', $employeeData);
-
-        $employee = Employee::create($employeeData);
-        \Log::info('Employee created with ID: ' . $employee->id);
-
-        // Handle allowances baadaye - skip kwanza
-        if ($request->has('allowances') && is_array($request->allowances)) {
-            \Log::info('Allowances found, will sync later: ', $request->allowances);
-        }
-
-        DB::commit();
-
-        \Log::info('=== EMPLOYEE STORE SUCCESS ===');
-
-        return redirect()->route('employees.index')
-            ->with('success', 'Employee registered successfully! ID: ' . $employeeId . ', Password: ' . $initialPassword)
-            ->with('new_employee_id', $employeeId);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        \Log::error('EMPLOYEE STORE ERROR: ' . $e->getMessage());
-        \Log::error('Stack trace: ' . $e->getTraceAsString());
-        
-        return redirect()->back()
-            ->with('error', 'Registration failed: ' . $e->getMessage())
-            ->withInput();
-    }
-}
-
-/**
- * Helper function to generate a unique Employee ID
- */
-private function generateUniqueEmployeeId()
-{
-    $prefix = "EMP";
-    
-    do {
-        // Tengeneza mchanganyiko wa herufi na namba (8 characters)
-        $randomPart = strtoupper(Str::random(8));
-        $newId = $prefix . '-' . $randomPart;
-        
-    } while (Employee::where('employee_id', $newId)->exists());
-
-    return $newId;
-}
-
-/**
- * Helper function to extract the last word from a full name (LastName)
- */
-private function getLastName($fullName)
-{
-    $parts = array_filter(explode(' ', trim($fullName)));
-    
-    if (count($parts) > 0) {
-        return end($parts);
-    }
-    return 'employee'; // Default password kama hakuna jina la mwisho
-}
     /**
      * Display the specified employee's data as HTML for modals.
      */
@@ -369,12 +124,20 @@ private function getLastName($fullName)
     {
         Log::info('Attempting to fetch employee with ID: ' . $employeeId);
         try {
+            // FIXED: Use correct field name for employee_id
             $employee = Employee::with(['departmentRel', 'allowances' => function($query) {
                 $query->where('active', 1); // Only load active allowances
             }])
-                ->withTrashed()
-                ->whereRaw('LOWER(employee_id) = ?', [strtolower($employeeId)])
-                ->firstOrFail();
+                ->where('employee_id', $employeeId) // FIXED: Use direct comparison
+                ->first();
+
+            if (!$employee) {
+                Log::error('Employee not found with ID: ' . $employeeId);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found.'
+                ], 404);
+            }
 
             $departments = Department::all();
             $banks = Bank::all();
@@ -434,7 +197,7 @@ private function getLastName($fullName)
                                 <select name="department" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                                     <option value="">Select Department</option>
                                     <?php foreach ($departments as $dept): ?>
-                                        <option value="<?php echo $dept->id; ?>" <?php echo $employee->department == $dept->id ? 'selected' : ''; ?>><?php echo $dept->name; ?></option>
+                                        <option value="<?php echo $dept->name; ?>" <?php echo $employee->department == $dept->name ? 'selected' : ''; ?>><?php echo $dept->name; ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
@@ -609,15 +372,21 @@ private function getLastName($fullName)
      */
     public function update(Request $request, $employeeId)
     {
-        $employee = Employee::withTrashed()
-            ->whereRaw('LOWER(employee_id) = ?', [strtolower($employeeId)])
-            ->firstOrFail();
+        // FIXED: Use direct comparison for employee_id
+        $employee = Employee::where('employee_id', $employeeId)->first();
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found.'
+            ], 404);
+        }
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('employees', 'email')->ignore($employee->id)],
             'position' => 'required|string|max:255',
-            'department' => 'required|exists:departments,id',
+            'department' => 'required|exists:departments,name',
             'base_salary' => 'required|numeric|min:0',
             'hire_date' => 'required|date',
             'employment_type' => 'required|in:full-time,part-time,contract',
@@ -632,8 +401,8 @@ private function getLastName($fullName)
             'nssf_number' => 'nullable|string|max:50',
             'tin_number' => 'nullable|string|max:50',
             'nhif_number' => 'nullable|string|max:50',
-            'allowance' => 'nullable|array', // ensure allowances array
-            'allowance.*' => 'exists:allowances,id',
+            'allowances' => 'nullable|array',
+            'allowances.*' => 'exists:allowances,id',
             'contract_end_date' => 'nullable|date|required_if:employment_type,contract',
             'status' => 'required|in:active,inactive,terminated',
         ], [
@@ -678,7 +447,7 @@ private function getLastName($fullName)
                 'nhif_number' => $request->nhif_number,
                 'status' => $request->status,
                 'allowances' => $totalAllowances,
-                'deductions' => 0.00, // Placeholder; update if deductions table exists
+                'deductions' => 0.00,
             ]);
 
             if ($request->has('allowances') && is_array($request->allowances)) {
@@ -710,9 +479,16 @@ private function getLastName($fullName)
     public function toggleStatus(Request $request, $employeeId)
     {
         try {
-            $employee = Employee::withTrashed()
-                ->whereRaw('LOWER(employee_id) = ?', [strtolower($employeeId)])
-                ->firstOrFail();
+            // FIXED: Use direct comparison for employee_id
+            $employee = Employee::where('employee_id', $employeeId)->first();
+
+            if (!$employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found.'
+                ], 404);
+            }
+
             $newStatus = $employee->status === 'active' ? 'inactive' : 'active';
 
             $employee->update(['status' => $newStatus]);
@@ -737,36 +513,114 @@ private function getLastName($fullName)
     public function downloadTemplate()
     {
         try {
+            // Create new Spreadsheet
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
-            // Define headers matching the import template instructions
+            // Define headers with required indicators
             $headers = [
-                'name', 'email', 'phone', 'gender', 'dob', 'nationality', 'address',
-                'department', 'position', 'employment_type', 'hire_date', 'contract_end_date',
-                'base_salary', 'bank_name', 'account_number', 'nssf_number', 'tin_number',
-                'nhif_number', 'role'
+                'name*', 'email*', 'phone', 'gender', 'dob (YYYY-MM-DD)', 'nationality', 'address',
+                'department*', 'position*', 'employment_type*', 'hire_date* (YYYY-MM-DD)', 'contract_end_date (YYYY-MM-DD)',
+                'base_salary*', 'bank_name', 'account_number', 'nssf_number', 'tin_number',
+                'nhif_number', 'role*'
             ];
 
+            // Set headers
             $sheet->fromArray([$headers], null, 'A1');
-            $sheet->getStyle('A1:S1')->getFont()->setBold(true);
 
-            // Add example data row for clarity
-            $exampleData = [
-                'John Doe', 'john.doe@example.com', '+255123456789', 'male', '1990-01-01',
-                'Tanzanian', '123 Street, Dar es Salaam', '1', 'Software Engineer',
-                'full-time', '2023-01-01', '', '1000000', 'CRDB', '1234567890',
-                'NSSF123456', 'TIN123456', 'NHIF123456', 'employee'
+            // Add sample data
+            $sampleData = [
+                'John Doe',
+                'john.doe@company.com',
+                '+255123456789',
+                'male',
+                '1990-05-15',
+                'Tanzanian',
+                '123 Main Street, Dar es Salaam',
+                'IT',  // Must match existing department name
+                'Software Developer',
+                'full-time', // full-time, part-time, or contract
+                '2024-01-15',
+                '', // Leave empty for non-contract employees
+                '1500000',
+                'CRDB Bank',
+                '0123456789',
+                'NSSF123456789',
+                'TIN123456789',
+                'NHIF123456789',
+                'employee' // Must match role slug
             ];
-            $sheet->fromArray([$exampleData], null, 'A2');
+            $sheet->fromArray([$sampleData], null, 'A2');
 
-            // Auto-size columns for better readability
+            // Style headers
+            $headerStyle = [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '2E7D32']
+                ]
+            ];
+            $sheet->getStyle('A1:S1')->applyFromArray($headerStyle);
+
+            // Style sample data
+            $sampleStyle = [
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E8F5E8']
+                ]
+            ];
+            $sheet->getStyle('A2:S2')->applyFromArray($sampleStyle);
+
+            // Add instructions
+            $instructions = [
+                'REQUIRED FIELDS marked with *',
+                'Email must be unique',
+                'Phone format: +255XXX',
+                'male/female/other',
+                'Date format: YYYY-MM-DD',
+                'Country name',
+                'Full address',
+                'Must exist in departments',
+                'Job title',
+                'full-time/part-time/contract',
+                'Date format: YYYY-MM-DD',
+                'Required for contract employees',
+                'Numeric value only',
+                'Bank name',
+                'Account number',
+                'NSSF number',
+                'TIN number',
+                'NHIF number',
+                'Must exist in roles (employee,manager,admin)'
+            ];
+            $sheet->fromArray([$instructions], null, 'A3');
+
+            // Style instructions
+            $instructionStyle = [
+                'font' => [
+                    'italic' => true,
+                    'color' => ['rgb' => '666666']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FFF9C4']
+                ]
+            ];
+            $sheet->getStyle('A3:S3')->applyFromArray($instructionStyle);
+
+            // Auto-size columns
             foreach (range('A', 'S') as $column) {
                 $sheet->getColumnDimension($column)->setAutoSize(true);
             }
 
+            // Freeze panes for better navigation
+            $sheet->freezePane('A4');
+
             $writer = new Xlsx($spreadsheet);
-            $filename = 'employee_import_template_' . date('Ymd_His') . '.xlsx';
+            $filename = 'employee_import_template.xlsx';
 
             $tempFile = tempnam(sys_get_temp_dir(), $filename);
             $writer->save($tempFile);
@@ -784,20 +638,40 @@ private function getLastName($fullName)
      */
     public function bulkImport(Request $request)
     {
+        // Validate file
         $validator = Validator::make($request->all(), [
-            'file' => 'required|mimes:xlsx,xls,csv'
+            'file' => 'required|mimes:xlsx,xls,csv|max:10240' // 10MB max
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()
-                ->with('error', 'Invalid file format. Please upload an XLSX, XLS, or CSV file.')
+                ->with('error', 'Invalid file format. Please upload an XLSX, XLS, or CSV file (max 10MB).')
                 ->withInput();
         }
 
         try {
+            // Check if Excel package is available
+            if (!class_exists('Maatwebsite\Excel\Excel')) {
+                throw new Exception('Excel package not installed. Run: composer require maatwebsite/excel');
+            }
+
+            // Import the file
             Excel::import(new EmployeesImport, $request->file('file'));
+
             return redirect()->route('employees.index')
-                ->with('success', 'Employees imported successfully.');
+                ->with('success', 'Employees imported successfully!');
+
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errorMessages = [];
+
+            foreach ($failures as $failure) {
+                $errorMessages[] = "Row {$failure->row()}: {$failure->errors()[0]}";
+            }
+
+            return redirect()->back()
+                ->with('error', 'Import validation failed: ' . implode('; ', $errorMessages));
+
         } catch (Exception $e) {
             Log::error('Bulk import failed: ' . $e->getMessage());
             return redirect()->back()
@@ -811,11 +685,218 @@ private function getLastName($fullName)
     public function export()
     {
         try {
-            return Excel::download(new EmployeesExport, 'employees_' . date('Ymd_His') . '.xlsx');
+            // Check if there are employees to export
+            $employeeCount = Employee::count();
+
+            if ($employeeCount === 0) {
+                return redirect()->back()->with('error', 'No employees found to export.');
+            }
+
+            // Use Laravel Excel package for export
+            if (class_exists('Maatwebsite\Excel\Excel')) {
+                return Excel::download(new EmployeesExport, 'employees_' . date('Ymd_His') . '.xlsx');
+            } else {
+                // Fallback manual export
+                return $this->manualExport();
+            }
         } catch (Exception $e) {
             Log::error('Export failed: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Failed to export employees: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Manual export fallback
+     */
+    private function manualExport()
+    {
+        try {
+            $employees = Employee::with(['departmentRel', 'allowances'])->get();
+
+            // Check if employees exist
+            if ($employees->isEmpty()) {
+                throw new Exception('No employees found to export.');
+            }
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Headers
+            $headers = [
+                'Employee ID', 'Name', 'Email', 'Phone', 'Department', 'Position',
+                'Employment Type', 'Hire Date', 'Base Salary', 'Status', 'Role'
+            ];
+            $sheet->fromArray([$headers], null, 'A1');
+
+            // Data
+            $data = [];
+            foreach ($employees as $employee) {
+                $data[] = [
+                    $employee->employee_id,
+                    $employee->name,
+                    $employee->email,
+                    $employee->phone,
+                    $employee->departmentRel->name ?? $employee->department,
+                    $employee->position,
+                    $employee->employment_type,
+                    $employee->hire_date->format('Y-m-d'),
+                    $employee->base_salary,
+                    $employee->status,
+                    $employee->role
+                ];
+            }
+            $sheet->fromArray($data, null, 'A2');
+
+            // Style headers
+            $headerStyle = [
+                'font' => ['bold' => true],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'E8F5E8']
+                ]
+            ];
+            $sheet->getStyle('A1:K1')->applyFromArray($headerStyle);
+
+            // Auto-size columns
+            foreach (range('A', 'K') as $column) {
+                $sheet->getColumnDimension($column)->setAutoSize(true);
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $filename = 'employees_export_' . date('Ymd_His') . '.xlsx';
+
+            $tempFile = tempnam(sys_get_temp_dir(), $filename);
+            $writer->save($tempFile);
+
+            return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+
+        } catch (Exception $e) {
+            throw new Exception('Manual export failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Store new employee
+     */
+    public function store(Request $request)
+    {
+        \Log::info('=== EMPLOYEE STORE START ===');
+        \Log::info('Request Data:', $request->all());
+
+        // Validation
+        $rules = [
+            'name' => 'required',
+            'email' => 'required|email|unique:employees,email',
+            'position' => 'required',
+            'department' => 'required',
+            'base_salary' => 'required|numeric',
+            'hire_date' => 'required|date',
+            'employment_type' => 'required',
+            'role' => 'required',
+            'status' => 'required',
+        ];
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            $errors = $validator->errors()->all();
+            \Log::error('VALIDATION ERRORS:', $errors);
+
+            return redirect()->back()
+                ->withErrors($validator)
+                ->with('error', 'Validation errors: ' . implode(', ', $errors))
+                ->withInput();
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Generate Employee ID
+            $employeeId = $this->generateUniqueEmployeeId();
+
+            // Generate Password
+            $nameParts = explode(' ', trim($request->name));
+            $lastName = end($nameParts);
+            $initialPassword = strtolower($lastName ?: 'employee123');
+            $password = Hash::make($initialPassword);
+
+            // Calculate total allowances
+            $totalAllowances = 0.00;
+            if ($request->has('allowances') && is_array($request->allowances)) {
+                $allowanceIds = $request->allowances;
+                $totalAllowances = Allowance::whereIn('id', $allowanceIds)->sum('amount');
+            }
+
+            // Create employee
+            $employeeData = [
+                'employee_id' => $employeeId,
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => $password,
+                'department' => $request->department,
+                'position' => $request->position,
+                'role' => $request->role,
+                'base_salary' => $request->base_salary,
+                'employment_type' => $request->employment_type,
+                'hire_date' => $request->hire_date,
+                'status' => $request->status,
+                'allowances' => $totalAllowances,
+                'deductions' => 0.00,
+            ];
+
+            // Add optional fields
+            $optionalFields = ['phone', 'gender', 'dob', 'nationality', 'address', 'contract_end_date',
+                              'bank_name', 'account_number', 'nssf_number', 'tin_number', 'nhif_number'];
+
+            foreach ($optionalFields as $field) {
+                if ($request->has($field) && !empty($request->$field)) {
+                    $employeeData[$field] = $request->$field;
+                }
+            }
+
+            \Log::info('Final Employee Data:', $employeeData);
+
+            $employee = Employee::create($employeeData);
+
+            // Sync allowances
+            if ($request->has('allowances') && is_array($request->allowances)) {
+                $employee->allowances()->sync($request->allowances);
+            }
+
+            DB::commit();
+
+            \Log::info('=== EMPLOYEE STORE SUCCESS ===');
+
+            return redirect()->route('employees.index', ['page' => 1, 'sort' => 'created_at', 'direction' => 'desc'])
+                ->with('success', 'Employee registered successfully! ID: ' . $employeeId . ', Password: ' . $initialPassword)
+                ->with('new_employee_id', $employeeId);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('EMPLOYEE STORE ERROR: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            return redirect()->back()
+                ->with('error', 'Registration failed: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    /**
+     * Helper function to generate a unique Employee ID
+     */
+    private function generateUniqueEmployeeId()
+    {
+        $prefix = "EMP";
+
+        do {
+            // Generate random combination of letters and numbers (8 characters)
+            $randomPart = strtoupper(Str::random(8));
+            $newId = $prefix . '-' . $randomPart;
+
+        } while (Employee::where('employee_id', $newId)->exists());
+
+        return $newId;
     }
 
     /**
@@ -836,5 +917,13 @@ private function getLastName($fullName)
         }
 
         return round((($currentCount - $previousCount) / $previousCount) * 100, 2);
+    }
+
+    /**
+     * Get employees table HTML for AJAX requests
+     */
+    private function getEmployeesTableHtml($employees, $request)
+    {
+        return view('dashboard.employee', compact('employees', 'request'))->fragment('employeesTable');
     }
 }

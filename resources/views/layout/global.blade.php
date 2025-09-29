@@ -140,17 +140,17 @@
                     @if($userRole && in_array(strtolower($userRole->role), ['admin', 'hr manager']))
                         {{-- Admin / HR Links --}}
                         <li><a href="{{ route('dashboard') }}" class="sidebar-link {{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="fas fa-tachometer-alt mr-3"></i><span class="sidebar-text">Dashboard</span></a></li>
-                        <li><a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees*') ? 'active' : '' }}"><i class="fas fa-userRoles mr-3"></i><span class="sidebar-text">Employees</span></a></li>
+                        <li><a href="{{ route('employees.index') }}" class="sidebar-link {{ request()->routeIs('employees*') ? 'active' : '' }}"><i class="fas fa-users mr-3"></i><span class="sidebar-text">Employees</span></a></li>
                         <li><a href="{{ route('payroll') }}" class="sidebar-link {{ request()->routeIs('payroll*') ? 'active' : '' }}"><i class="fas fa-file-invoice-dollar mr-3"></i><span class="sidebar-text">Payroll</span></a></li>
                         <li><a href="{{ route('reports') }}" class="sidebar-link {{ request()->routeIs('reports*') ? 'active' : '' }}"><i class="fas fa-chart-bar mr-3"></i><span class="sidebar-text">Reports</span></a></li>
                         <li><a href="{{ route('compliance.index') }}" class="sidebar-link {{ request()->routeIs('compliance*') ? 'active' : '' }}"><i class="fas fa-shield-alt mr-3"></i><span class="sidebar-text">Compliance</span></a></li>
                         <li><a href="{{ route('dashboard.attendance') }}" class="sidebar-link {{ request()->routeIs('dashboard.attendance') ? 'active' : '' }}"><i class="fas fa-clock mr-3"></i><span class="sidebar-text">Attendance</span></a></li>
-                        <li><a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}"><i class="fas fa-userRole-circle mr-3"></i><span class="sidebar-text">Employee Portal</span></a></li>
+                        <li><a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}"><i class="fas fa-user-circle mr-3"></i><span class="sidebar-text">Employee Portal</span></a></li>
                         <li><a href="{{ route('settings.index') }}" class="sidebar-link {{ request()->routeIs('settings*') ? 'active' : '' }}"><i class="fas fa-cog mr-3"></i><span class="sidebar-text">Settings</span></a></li>
                     @elseif($userRole)
                         {{-- Employee Links --}}
                         <li><a href="{{ route('portal.attendance') }}" class="sidebar-link {{ request()->routeIs('portal.attendance') ? 'active' : '' }}"><i class="fas fa-clock mr-3"></i><span class="sidebar-text">My Attendance</span></a></li>
-                        <li><a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}"><i class="fas fa-userRole-circle mr-3"></i><span class="sidebar-text">Employee Portal</span></a></li>
+                        <li><a href="{{ route('employee.portal') }}" class="sidebar-link {{ request()->routeIs('employee.portal') ? 'active' : '' }}"><i class="fas fa-user-circle mr-3"></i><span class="sidebar-text">Employee Portal</span></a></li>
                     @endif
                 </ul>
             </nav>
@@ -177,7 +177,7 @@
                     </div>
                     <div class="flex items-center">
                         <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center mr-2">
-                            <i class="fas fa-userRole text-white"></i>
+                            <i class="fas fa-user text-white"></i>
                         </div>
                         <div>
                             <p class="text-sm font-medium text-gray-800">{{ $userRole ? $userRole->name : 'Guest' }}</p>
