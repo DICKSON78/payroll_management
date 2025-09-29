@@ -12,7 +12,7 @@
 @endsection
 
 @section('header-subtitle')
-    <span class="text-gray-600">Manage your personal details, payslips, and leave balances.</span>
+    <span class="text-gray-600">Manage your personal details, payslips, leave balances, and access your reports.</span>
 @endsection
 
 @section('content')
@@ -39,6 +39,9 @@
             </button>
             <button id="leaveBalancesTab" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-t-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200" role="tab" aria-selected="false" aria-controls="leaveBalancesContainer">
                 Leave Balances
+            </button>
+            <button id="reportsTab" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-t-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200" role="tab" aria-selected="false" aria-controls="reportsContainer">
+                My Reports
             </button>
         </div>
     </div>
@@ -211,6 +214,102 @@
         </div>
     </div>
 
+    <!-- Reports Container -->
+    <div id="reportsContainer" class="hidden">
+        <!-- Search Input -->
+        <div class="mb-6 relative max-w-md">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.65a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <input id="searchReports" type="text" placeholder="Search by report type or period..." class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" aria-label="Search reports by type or period">
+        </div>
+
+        <!-- Reports Table Header -->
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                <i class="fas fa-file-alt text-green-500 mr-2"></i> Your Reports
+                <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $reports->total() }} reports</span>
+            </h3>
+        </div>
+
+        <!-- Table Container -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-700 text-sm">
+                            <th class="py-3.5 px-6 text-left font-semibold">Report ID</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Type</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Period</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Format</th>
+                            <th class="py-3.5 px-6 text-left font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportsTable" class="divide-y divide-gray-100">
+                        @foreach($reports as $report)
+                            @php
+                                $formatColors = [
+                                    'pdf' => 'bg-purple-100 text-purple-800',
+                                    'excel' => 'bg-green-100 text-green-800'
+                                ];
+                                $formatColor = $formatColors[strtolower($report->export_format ?? 'pdf')] ?? 'bg-gray-100 text-gray-800';
+                            @endphp
+                            <tr class="bg-white hover:bg-gray-50 transition-all duration-200 report-row group" data-type="{{ strtolower($report->type ?? '') }}" data-period="{{ strtolower($report->period ?? '') }}">
+                                <td class="py-4 px-6 text-sm text-gray-900 font-mono">{{ $report->report_id ?? 'N/A' }}</td>
+                                <td class="py-4 px-6 text-sm text-gray-700">{{ ucwords(str_replace('_', ' ', $report->type ?? 'unknown')) }}</td>
+                                <td class="py-4 px-6 text-sm text-gray-900">{{ $report->period ?? 'N/A' }}</td>
+                                <td class="py-4 px-6">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $formatColor }}">
+                                        {{ strtoupper($report->export_format ?? 'PDF') }}
+                                    </span>
+                                </td>
+                                <td class="py-4 px-6 text-sm">
+                                    <a href="{{ route('employee.report.download', $report->id) }}" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Download report">
+                                        <i class="fas fa-download mr-1"></i> Download
+                                    </a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            @if($reports->count() == 0)
+                <div class="text-center py-12">
+                    <div class="mx-auto w-24 h-24 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                        <i class="fas fa-file-alt text-gray-400 text-2xl"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-1">No reports found</h3>
+                    <p class="text-gray-500 mb-6">No reports are available yet.</p>
+                </div>
+            @endif
+        </div>
+
+        <!-- Pagination -->
+        @if($reports->hasPages())
+            <div class="mt-6 flex items-center justify-between border-t border-gray-200 pt-5">
+                <div class="text-sm text-gray-700">
+                    Showing {{ $reports->firstItem() }} to {{ $reports->lastItem() }} of {{ $reports->total() }} results
+                </div>
+                <div class="flex space-x-2">
+                    @if($reports->onFirstPage())
+                        <span class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-sm">Previous</span>
+                    @else
+                        <a href="{{ $reports->previousPageUrl() }}" class="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-green-600 hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Previous</a>
+                    @endif
+                    @if($reports->hasMorePages())
+                        <a href="{{ $reports->nextPageUrl() }}" class="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-green-600 hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Next</a>
+                    @else
+                        <span class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-sm">Next</span>
+                    @endif
+                </div>
+            </div>
+        @endif
+    </div>
+
 @endsection
 
 @section('modals')
@@ -223,6 +322,7 @@
         document.getElementById('updateDetailsTab').addEventListener('click', () => toggleTab('updateDetailsTab'));
         document.getElementById('payslipsTab').addEventListener('click', () => toggleTab('payslipsTab'));
         document.getElementById('leaveBalancesTab').addEventListener('click', () => toggleTab('leaveBalancesTab'));
+        document.getElementById('reportsTab').addEventListener('click', () => toggleTab('reportsTab'));
 
         // Search functionality for payslips
         const searchPayslips = document.getElementById('searchPayslips');
@@ -238,6 +338,21 @@
             });
         }
 
+        // Search functionality for reports
+        const searchReports = document.getElementById('searchReports');
+        if (searchReports) {
+            searchReports.addEventListener('input', function() {
+                const searchValue = this.value.toLowerCase();
+                const rows = document.querySelectorAll('.report-row');
+                rows.forEach(row => {
+                    const type = row.dataset.type || '';
+                    const period = row.dataset.period || '';
+                    const matches = type.includes(searchValue) || period.includes(searchValue);
+                    row.style.display = matches ? '' : 'none';
+                });
+            });
+        }
+
         // Reset form on tab switch
         document.getElementById('updateDetailsTab').addEventListener('click', () => {
             document.getElementById('updateDetailsForm').reset();
@@ -245,8 +360,8 @@
     });
 
     function toggleTab(tabId) {
-        const tabs = ['updateDetailsTab', 'payslipsTab', 'leaveBalancesTab'];
-        const containers = ['updateDetailsContainer', 'payslipsContainer', 'leaveBalancesContainer'];
+        const tabs = ['updateDetailsTab', 'payslipsTab', 'leaveBalancesTab', 'reportsTab'];
+        const containers = ['updateDetailsContainer', 'payslipsContainer', 'leaveBalancesContainer', 'reportsContainer'];
 
         tabs.forEach(id => {
             const tab = document.getElementById(id);
@@ -270,7 +385,8 @@
         }
 
         const containerId = tabId === 'updateDetailsTab' ? 'updateDetailsContainer' :
-                           tabId === 'payslipsTab' ? 'payslipsContainer' : 'leaveBalancesContainer';
+                           tabId === 'payslipsTab' ? 'payslipsContainer' :
+                           tabId === 'leaveBalancesTab' ? 'leaveBalancesContainer' : 'reportsContainer';
         const container = document.getElementById(containerId);
         if (container) container.classList.remove('hidden');
     }

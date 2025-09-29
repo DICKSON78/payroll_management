@@ -254,14 +254,9 @@
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
                     </div>
-                    <div class="relative">
+                    <div>
                         <label for="report_period" class="block text-gray-600 text-sm font-medium mb-2">Report Period</label>
-                        <div class="relative w-full">
-                            <input type="text" name="report_period" id="report_period" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900 pr-10" placeholder="Select period" readonly>
-                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <i class="fas fa-calendar-alt text-gray-400"></i>
-                            </span>
-                        </div>
+                        <input type="text" name="report_period" id="report_period" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900" placeholder="Select period">
                         <span class="text-red-500 text-xs mt-1 hidden" id="reportPeriodError">Report Period is required</span>
                         @error('report_period')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -382,7 +377,6 @@
             if (altInput && altInput.classList.contains('flatpickr-input')) {
                 altInput.classList.add('bg-gray-50', 'border', 'border-gray-200', 'rounded-lg', 'focus:ring-2', 'focus:ring-green-500', 'focus:border-green-500', 'block', 'w-full', 'py-2.5', 'px-3', 'leading-6', 'transition-all', 'duration-200', 'text-gray-900');
                 altInput.classList.remove('flatpickr-input'); // Remove default Flatpickr class to avoid conflicts
-                altInput.style.paddingRight = '2.5rem'; // Match pr-10 for calendar icon
             }
         }
 
@@ -532,44 +526,4 @@
     });
 </script>
 
-<style>
-    /* Custom Flatpickr styles to match Tailwind */
-    .flatpickr-calendar {
-        font-family: inherit;
-        border-radius: 0.5rem;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
-    .flatpickr-day.selected, .flatpickr-day.selected:hover {
-        background-color: #10b981;
-        color: white;
-        border-color: #10b981;
-    }
-    .flatpickr-day.today {
-        border-color: #10b981;
-    }
-    .flatpickr-monthDropdown-month, .flatpickr-current-month select, .flatpickr-current-month input {
-        color: #374151;
-        font-weight: 500;
-    }
-    .flatpickr-prev-month, .flatpickr-next-month {
-        color: #10b981;
-    }
-    .flatpickr-prev-month:hover, .flatpickr-next-month:hover {
-        color: #059669;
-    }
-    /* Ensure all inputs have consistent width and styling */
-    #generateReportForm select,
-    #generateReportForm input[type="text"] {
-        box-sizing: border-box;
-        width: 100%;
-        height: 2.5rem; /* Match py-2.5 */
-        font-size: 0.875rem; /* Match text-sm */
-    }
-    /* Override Flatpickr altInput styles */
-    .flatpickr-input.active {
-        box-sizing: border-box;
-        width: 100%;
-        height: 2.5rem;
-        padding-right: 2.5rem; /* Match pr-10 */
-    }
-</style>
+

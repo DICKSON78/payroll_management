@@ -85,7 +85,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="py-4 px-6 text-sm text-gray-900">{{ $task->due_date->format('d/m/Y') }}</td>
+                        <td class="py-4 px-6 text-sm text-gray-900"> {{ \Carbon\Carbon::parse($task->due_date)->format('d/m/Y') }}</td>
                         <td class="py-4 px-6 text-sm text-gray-900 font-medium">TZS {{ number_format($task->amount, 2) }}</td>
                         <td class="py-4 px-6">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusColor }}">

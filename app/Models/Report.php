@@ -3,19 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Report extends Model
 {
-    protected $fillable = [
-        'report_id',
-        'type',
-        'period',
-        'employee_id',
-        'export_format',
-    ];
+    use SoftDeletes;
+
+    protected $guarded = [];
 
     public function employee()
     {
-        return $this->belongsTo(Employee::class);
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
+    public function generatedBy()
+    {
+        return $this->belongsTo(Employee::class, 'generated_by');
     }
 }

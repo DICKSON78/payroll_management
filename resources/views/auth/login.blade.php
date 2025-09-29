@@ -3,59 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TanzaniaPay - Login</title>
+    <title>Login</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            light: '#10a37f',
+                            DEFAULT: '#1a7f64',
+                            dark: '#156352',
+                        },
+                        secondary: {
+                            DEFAULT: '#1F2937',
+                            dark: '#111827',
+                        },
+                        accent: {
+                            DEFAULT: '#F3F4F6',
+                            light: '#F9FAFB',
+                        }
+                    },
+                    boxShadow: {
+                        'card': '0 8px 24px rgba(0, 0, 0, 0.15)',
+                        'card-hover': '0 12px 32px rgba(0, 0, 0, 0.2)',
+                    },
+                    borderRadius: {
+                        'xl': '1rem',
+                        '2xl': '1.5rem',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        * { font-family: 'Poppins', sans-serif; }
-        .btn-primary { background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%); color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); }
-        .card { transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background: white; border-radius: 0.75rem; padding: 2rem; }
-        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); }
-        .input-error { border-color: #ef4444; }
-        .error-message { color: #ef4444; }
+        .premium-gradient {
+            background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
+        }
+        .loading-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #10a37f;
+            transform: scaleX(0);
+            transform-origin: left;
+            animation: loading 5s ease-in-out forwards;
+            z-index: 1000;
+        }
+        @keyframes loading {
+            0% { transform: scaleX(0); }
+            50% { transform: scaleX(0.8); }
+            100% { transform: scaleX(1); opacity: 0; }
+        }
+        .button-glow {
+            position: relative;
+            overflow: hidden;
+        }
+        .button-glow::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: 0.5s;
+        }
+        .button-glow:hover::before {
+            left: 100%;
+        }
+        .input-icon {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: 0.75rem;
+            color: #1F2937;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+        .input-field {
+            padding-left: 2.5rem; /* Ensure enough space for icon */
+            line-height: 1.5rem; /* Match placeholder text alignment */
+        }
     </style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+<body class="font-poppins bg-accent text-gray-600 min-h-screen flex items-center justify-center p-4">
+    <!-- Loading Bar -->
+    <div id="loading-bar" class="loading-bar"></div>
+
+    <!-- Main Content -->
     <div class="w-full max-w-md">
-        <div class="card">
-            <div class="flex items-center justify-center mb-6">
-                <i class="fas fa-money-check-alt text-3xl mr-3 text-green-400"></i>
-                <h1 class="text-2xl font-bold text-gray-800">Tanzania<span class="text-green-400">Pay</span></h1>
+        <div class="bg-accent-light rounded-2xl shadow-card overflow-hidden">
+            <!-- Header -->
+            <div class="bg-accent-light p-6 border-b border-primary/10 text-center">
+                <div class="flex justify-center items-center mb-4">
+                    <img src="{{ asset('assets/logo.png') }}" alt="Logo" class="h-16">
+                </div>
+                <p class="text-green-600 font-semibold mt-1 text-2xl">Welcome <span class="font-semibold text-gray-800">Back</span></p>
             </div>
-            <h2 class="text-xl font-semibold text-gray-800 text-center mb-4">Login</h2>
-            <form id="loginForm" method="POST" action="{{ route('login') }}">
-                @csrf
-                <div class="mb-4">
-                    <label for="email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                    <input id="email" type="email" name="email" value="{{ old('email') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('email') border-red-500 @enderror" required autofocus>
-                    @error('email')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
+
+            <!-- Form Content -->
+            <div class="p-6 pt-4">
+                <!-- Error Messages -->
+                <div id="error-message" class="hidden mb-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700">
+                    <!-- Placeholder for error messages -->
                 </div>
-                <div class="mb-4">
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input id="password" type="password" name="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('password') border-red-500 @enderror" required>
-                    @error('password')
-                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                    @enderror
-                </div>
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center">
-                        <input id="remember_me" type="checkbox" name="remember" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded">
-                        <label for="remember_me" class="ml-2 block text-sm text-gray-900">Remember me</label>
+
+                <form id="login-form" method="POST" action="{{ route('login') }}" class="space-y-5">
+                    @csrf
+
+                    <!-- Email Input -->
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-600 mb-1">Email Address</label>
+                        <div class="relative">
+                            <i class="fas fa-envelope input-icon"></i>
+                            <input type="email" id="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="email"
+                                class="input-field w-full px-4 py-3 border border-primary/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-accent-light text-gray-600 @error('email') border-red-500 @enderror"
+                                placeholder="Email address">
+                            @error('email')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
-                    <a href="{{ route('password.request') }}" class="text-sm text-green-600 hover:text-green-800">Forgot Password?</a>
-                </div>
-                <button type="submit" class="w-full btn-primary">
-                    <i class="fas fa-sign-in-alt mr-2"></i> Login
-                </button>
-            </form>
+
+                    <!-- Password Input -->
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-600 mb-1">Password</label>
+                        <div class="relative">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input type="password" id="password" name="password" required autocomplete="current-password"
+                                class="input-field w-full px-4 py-3 border border-primary/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition bg-accent-light text-gray-600 @error('password') border-red-500 @enderror"
+                                placeholder="Password">
+                            <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-primary password-toggle">
+                                <i class="far fa-eye-slash"></i>
+                            </button>
+                            @error('password')
+                                <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <!-- Remember Me and Forgot Password -->
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <input id="remember_me" type="checkbox" name="remember" class="h-4 w-4 text-primary focus:ring-primary border-primary/20 rounded">
+                            <label for="remember_me" class="ml-2 block text-sm text-gray-600">Remember me</label>
+                        </div>
+                        <a href="{{ route('password.request') }}" class="text-sm text-primary hover:text-primary-dark">Forgot Password?</a>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="pt-4">
+                        <button type="submit" id="submit-btn" class="w-full premium-gradient text-white font-medium py-3 px-4 rounded-xl transition duration-200 shadow-md hover:shadow-lg button-glow">
+                            <i class="fas fa-sign-in-alt mr-2"></i> Login
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
+
+    <script>
+        // Trigger loading bar on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const loadingBar = document.getElementById('loading-bar');
+            loadingBar.style.display = 'block';
+            setTimeout(() => {
+                loadingBar.style.display = 'none';
+            }, 2000); // Matches animation duration
+
+            // Reset button on validation errors
+            const hasError = document.querySelector('.bg-red-100');
+            const submitBtn = document.querySelector('#login-form button[type="submit"]');
+
+            if (hasError && submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-sign-in-alt mr-2"></i> Login';
+            }
+        });
+
+        // Password toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordToggle = document.querySelector('.password-toggle');
+            const passwordInput = document.getElementById('password');
+
+            if (passwordToggle) {
+                passwordToggle.addEventListener('click', function() {
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        this.querySelector('i').classList.remove('fa-eye-slash');
+                        this.querySelector('i').classList.add('fa-eye');
+                    } else {
+                        passwordInput.type = 'password';
+                        this.querySelector('i').classList.remove('fa-eye');
+                        this.querySelector('i').classList.add('fa-eye-slash');
+                    }
+                });
+            }
+        });
+
+        // Form submission with loading bar
+        document.getElementById('login-form').addEventListener('submit', function() {
+            const btn = this.querySelector('button[type="submit"]');
+            const loadingBar = document.getElementById('loading-bar');
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Logging in...';
+                loadingBar.style.display = 'block';
+                loadingBar.style.animation = 'loading 7s ease-in-out forwards';
+                setTimeout(() => {
+                    loadingBar.style.display = 'none';
+                }, 7000);
+            }
+        });
+    </script>
 </body>
 </html>

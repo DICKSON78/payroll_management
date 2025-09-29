@@ -2,38 +2,30 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class LeaveRequest extends Model
 {
-    use HasFactory;
+    use SoftDeletes;
 
-    protected $fillable = [
-        'employee_id',
-        'leave_type',
-        'start_date',
-        'end_date',
-        'reason',
-        'status',
-        'feedback',
-    ];
+    protected $guarded = [];
 
-    /**
-     * The attributes that should be cast to native types.
-     *
-     * @var array
-     */
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
-    /**
-     * Get the employee that submitted the leave request.
-     */
     public function employee()
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(Employee::class, 'approved_by');
     }
 }

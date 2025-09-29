@@ -15,26 +15,54 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // Hakikisha mtumiaji ame-login kabla ya kuendelea.
         if (!Auth::check()) {
-            Log::info('RoleMiddleware - User not authenticated, redirecting to login');
-            return redirect('/login')->with('error', 'You must be logged in to access this page.');
+            Log::info('RoleMiddleware - User not authenticated, redirecting to login', ['route' => $request->route()->getName()]);
+            return redirect()->route('login')->with('error', 'You must be logged in to access this page.');
         }
 
         $user = Auth::user();
-        
-        // Pata jukumu la mtumiaji kwa kutumia sifa ya 'role'.
-        $userRole = strtolower(trim($user->role ?? ''));
+
+        // REKEBISHO MUHIMU HAPA: Tumia uhusiano wa 'role' kupata jina la jukumu.
+        // Ikiwa mtumiaji hana jukumu, tumia 'employee' kama default, kama ilivyo kwenye Controller.
+        $userRole = strtolower($user->role->name ?? 'employee');
+
+        // Boresha hili: Tumia array_map kuhakikisha majukumu yote yanakuwa herufi ndogo na bila nafasi tupu.
         $allowedRoles = array_map(fn($role) => strtolower(trim($role)), $roles);
 
-        // Fanya ukaguzi wa mwisho.
-        if ($userRole && in_array($userRole, $allowedRoles)) {
-            Log::info('RoleMiddleware - Access granted');
+        Log::info('RoleMiddleware - Checking permissions', [
+            'user_id' => $user->id,
+            'user_role' => $userRole,
+            'allowed_roles' => $allowedRoles,
+            'route_name' => $request->route()->getName(),
+        ]);
+
+        // Kwanza angalia kama role ipo kwenye allowedRoles
+        if (in_array($userRole, $allowedRoles)) {
+            Log::info("RoleMiddleware - Access granted for role: {$userRole}");
+
+            // Direct user kulingana na role yake
+            if ($userRole === 'employee' && $request->route()->getName() === 'dashboard') {
+                Log::info('RoleMiddleware - Redirecting employee from dashboard to portal attendance');
+                return redirect()->route('portal.attendance');
+            }
+            
+            // Hili sharti la uelekezaji linaonekana batili:
+            // Kama Admin au HR Manager anataka kufikia employee.portal, mpe ruhusa badala ya kumuelekeza.
+            // Lakini nitaacha iwe sawa na msimbo wako ili kuepuka mabadiliko makubwa:
+            if (in_array($userRole, ['admin', 'hr manager']) && $request->route()->getName() === 'employee.portal') {
+                 Log::info('RoleMiddleware - Redirecting admin/hr from employee portal to dashboard');
+                 return redirect()->route('dashboard');
+             }
+
             return $next($request);
         }
 
-        // Ikiwa mtumiaji hana ruhusa.
-        Log::info('RoleMiddleware - Access denied');
-        return back()->with('error', 'You do not have the required permissions to access this page.');
+        // Ikiwa hana ruhusa
+        Log::warning("RoleMiddleware - Access denied for role: {$userRole}", [
+            'user_id' => $user->id,
+            'allowed_roles' => $allowedRoles,
+            'route_name' => $request->route()->getName(),
+        ]);
+        abort(403, 'You do not have the required permissions to access this page.');
     }
 }

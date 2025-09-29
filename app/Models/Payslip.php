@@ -2,20 +2,27 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Payslip extends Model
 {
-    use HasFactory;
+    use SoftDeletes;
 
-    protected $fillable = [
-        'employee_id', 'payroll_id', 'period', 'gross_salary', 'nssf', 'paye', 'nhif',
-        'other_deductions', 'net_salary', 'status', 'wcf', 'sdl'
-    ];
+    protected $guarded = [];
 
     public function employee()
     {
         return $this->belongsTo(Employee::class);
+    }
+    // Add to Payslip model
+    public function allowance()
+    {
+        return $this->belongsTo(Allowance::class);
+    }
+
+    public function deduction()
+    {
+        return $this->belongsTo(Deduction::class);
     }
 }

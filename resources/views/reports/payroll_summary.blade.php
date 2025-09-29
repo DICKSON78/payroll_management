@@ -23,15 +23,12 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($report->employee ? [$report->employee] : \App\Models\Employee::all() as $employee)
-                @php
-                    $payslip = \App\Models\Payslip::where('employee_id', $employee->id)->where('period', $report->period)->first();
-                @endphp
+            @foreach($data as $payslip)
                 <tr>
-                    <td>{{ $employee->name }}</td>
-                    <td>{{ $employee->employee_id }}</td>
-                    <td>{{ $payslip->gross_salary ?? 0 }}</td>
-                    <td>{{ $payslip->net_salary ?? 0 }}</td>
+                    <td>{{ $payslip->employee->name ?? 'N/A' }}</td>
+                    <td>{{ $payslip->employee->employee_id ?? 'N/A' }}</td>
+                    <td>{{ number_format($payslip->gross_salary, 2) }}</td>
+                    <td>{{ number_format($payslip->net_salary, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>

@@ -16,19 +16,95 @@
 @endsection
 
 @section('content')
-    <!-- Success/Error Message -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
     @if(session('success'))
         <div class="bg-green-50 border-l-4 border-green-400 text-green-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
             <span class="block sm:inline">{{ session('success') }}</span>
         </div>
     @endif
+
     @if(session('error'))
         <div class="bg-red-50 border-l-4 border-red-400 text-red-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
             <span class="block sm:inline">{{ session('error') }}</span>
         </div>
     @endif
 
-    <!-- Tab Navigation -->
+    <!-- Quick Actions -->
+    <div class="mb-8">
+        <h3 class="text-lg font-medium text-gray-700 mb-4 flex items-center">
+            <i class="fas fa-bolt text-green-500 mr-2"></i> Quick Actions
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-green-50 hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('bulkImportModal')">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-upload text-green-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900">Bulk Import</div>
+                        <div class="text-sm text-gray-500">Import multiple employees</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-green-50 hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="exportEmployees()">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-download text-green-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900">Export Employees</div>
+                        <div class="text-sm text-gray-500">Download employee data</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm hover:bg-green-50 hover:shadow-md transition-all duration-200 p-4 cursor-pointer" onclick="openModal('templateInstructionsModal')">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-file-download text-green-600 text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-gray-900">Download Template</div>
+                        <div class="text-sm text-gray-500">Get import template</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="mb-6 bg-white rounded-xl border border-gray-200 shadow-sm p-4" id="filterSection">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <h3 class="text-lg font-medium text-gray-700 flex items-center">
+                <i class="fas fa-filter text-green-500 mr-2"></i> Filter Employees
+            </h3>
+            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <div class="relative w-full sm:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <input type="text" id="searchEmployee" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="Search by name, email, or ID..." value="{{ $search ?? '' }}">
+                </div>
+                <select id="departmentFilter" class="bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 py-2 px-3 text-sm w-full sm:w-48">
+                    <option value="">All Departments</option>
+                    @foreach($departments as $department)
+                        <option value="{{ strtolower($department->name) }}" {{ $request->input('department') == strtolower($department->name) ? 'selected' : '' }}>{{ $department->name }}</option>
+                    @endforeach
+                </select>
+                <select id="statusFilter" class="bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 py-2 px-3 text-sm w-full sm:w-48">
+                    <option value="">All Status</option>
+                    <option value="active" {{ $request->input('status') == 'active' ? 'selected' : '' }}>Active</option>
+                    <option value="inactive" {{ $request->input('status') == 'inactive' ? 'selected' : '' }}>Inactive</option>
+                    <option value="terminated" {{ $request->input('status') == 'terminated' ? 'selected' : '' }}>Terminated</option>
+                </select>
+                <button onclick="clearFilters()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 transition-all duration-200 flex items-center justify-center">
+                    <i class="fas fa-times mr-2"></i> Clear Filters
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs Navigation -->
     <div class="mb-6">
         <div class="flex space-x-4 border-b border-gray-200" role="tablist">
             <button id="allEmployeesTab" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-t-md focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200" role="tab" aria-selected="true" aria-controls="employeesTableContainer">
@@ -42,28 +118,12 @@
 
     <!-- Employees Table Container -->
     <div id="employeesTableContainer" class="block">
-        <!-- Search Input -->
-        <div class="mb-6 relative max-w-md">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.65a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-            </div>
-            <input id="searchEmployee" type="text" placeholder="Search by name or ID..." class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" aria-label="Search employees by name or ID">
-        </div>
-
-        <!-- Employee Table Header -->
-        <div class="flex justify-between items-center mb-4">
+        @fragment('employeesTable')
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h3 class="text-lg font-medium text-gray-700 flex items-center">
-                <i class="fas fa-users text-green-500 mr-2"></i> All Employees
+                <i class="fas fa-users text-green-500 mr-2"></i> Employee List
                 <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $employees->total() }} employees</span>
             </h3>
-            <div class="flex space-x-2">
-
-                <button class="text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 focus:ring-4 focus:ring-green-100 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center shadow-sm hover:shadow-md" onclick="openModal('bulkImportModal')">
-                    <i class="fas fa-upload mr-2"></i> Bulk Import
-                </button>
-            </div>
         </div>
 
         <!-- Table Container -->
@@ -81,467 +141,356 @@
                             <th class="py-3.5 px-6 text-left font-semibold">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="employeesTable" class="divide-y divide-gray-100">
+                    <tbody id="employeesTableBody" class="divide-y divide-gray-100">
                         @foreach($employees as $employee)
-                        <tr id="employee-{{ $employee->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 employee-row group" data-name="{{ strtolower($employee->name) }}" data-id="{{ strtolower($employee->employee_id) }}">
-                            <td class="py-4 px-6">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                                        <span class="font-medium text-green-800">{{ substr($employee->name, 0, 1) }}</span>
+                            @php
+                                $statusColors = [
+                                    'active' => 'bg-green-100 text-green-800',
+                                    'inactive' => 'bg-red-100 text-red-800',
+                                    'terminated' => 'bg-gray-100 text-gray-800'
+                                ];
+                                $statusColor = $statusColors[$employee->status ?? 'active'] ?? 'bg-gray-100 text-gray-800';
+                            @endphp
+                            <tr class="bg-white hover:bg-gray-50 transition-all duration-200 employee-row"
+                                data-name="{{ strtolower($employee->name) }}"
+                                data-email="{{ strtolower($employee->email) }}"
+                                data-employee-id="{{ strtolower($employee->employee_id) }}"
+                                data-department="{{ strtolower($employee->department) }}"
+                                data-status="{{ strtolower($employee->status) }}"
+                                data-position="{{ strtolower($employee->position) }}">
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="font-medium text-green-800">{{ substr($employee->name, 0, 1) }}</span>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-gray-900">{{ $employee->name }}</div>
+                                            <div class="text-sm text-gray-500">{{ $employee->email }}</div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div class="font-medium text-gray-900">{{ $employee->name }}</div>
-                                        <div class="text-sm text-gray-500">{{ $employee->email }}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="py-4 px-6 text-sm text-gray-900 font-mono">{{ $employee->employee_id }}</td>
-                            <td class="py-4 px-6 text-sm text-gray-700">{{ $employee->position }}</td>
-                            <td class="py-4 px-6">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    {{ $employee->department }}
-                                </span>
-                            </td>
-                            <td class="py-4 px-6 text-sm text-gray-900 font-medium">TZS {{ number_format($employee->base_salary, 0) }}</td>
-                            <td class="py-4 px-6">
-                                @if($employee->status == 'active')
+                                </td>
+                                <td class="py-4 px-6 text-sm text-gray-900 font-mono">{{ $employee->employee_id }}</td>
+                                <td class="py-4 px-6 text-sm text-gray-700">{{ $employee->position ?? 'N/A' }}</td>
+                                <td class="py-4 px-6">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        <span class="w-2 h-2 bg-green-500 rounded-full mr-1.5"></span> Active
+                                        {{ $employee->department ?? 'N/A' }}
                                     </span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                        <span class="w-2 h-2 bg-red-500 rounded-full mr-1.5"></span> {{ ucfirst($employee->status) }}
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="py-4 px-6">
-                                <div class="flex items-center space-x-2">
-                                    <button onclick="editEmployee({{ $employee->id }})" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Edit" aria-label="Edit employee {{ $employee->name }}">
-                                        <i class="fas fa-edit text-sm"></i>
-                                    </button>
-                                    <button onclick="openDeleteModal({{ $employee->id }})" class="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition-all duration-200" title="Delete" aria-label="Delete employee {{ $employee->name }}">
-                                        <i class="fas fa-trash text-sm"></i>
-                                    </button>
-                                    <button class="text-gray-400 hover:text-gray-600 p-1.5 rounded-md hover:bg-gray-100 transition-all duration-200" title="View Details" aria-label="View details for {{ $employee->name }}">
-                                        <i class="fas fa-ellipsis-h text-sm"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+                                </td>
+                                <td class="py-4 px-6 text-sm font-medium text-gray-900">TZS {{ number_format($employee->base_salary, 0) }}</td>
+                                <td class="py-4 px-6">
+                                    @if($employee->status == 'active')
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <span class="w-2 h-2 bg-green-500 rounded-full mr-1.5"></span> Active
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <span class="w-2 h-2 bg-red-500 rounded-full mr-1.5"></span> {{ ucfirst($employee->status) }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center space-x-2">
+                                        <button onclick="viewEmployeeDetails('{{ $employee->employee_id }}')" class="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition-all duration-200" title="View Details">
+                                            <i class="fas fa-eye text-sm"></i>
+                                        </button>
+                                        <button onclick="editEmployee('{{ $employee->employee_id }}')" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Edit Employee">
+                                            <i class="fas fa-edit text-sm"></i>
+                                        </button>
+                                        <button onclick="toggleStatus('{{ $employee->employee_id }}', '{{ $employee->status }}')" class="text-gray-600 hover:text-gray-800 p-1.5 rounded-md hover:bg-gray-50 transition-all duration-200" title="{{ $employee->status === 'active' ? 'Deactivate' : 'Activate' }} Employee">
+                                            <i class="fas {{ $employee->status === 'active' ? 'fa-power-off' : 'fa-play' }} text-sm"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
                         @endforeach
                     </tbody>
                 </table>
             </div>
-
-            <!-- Empty State -->
-            @if($employees->count() == 0)
-            <div class="text-center py-12">
-                <div class="mx-auto w-24 h-24 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                    <i class="fas fa-users text-gray-400 text-2xl"></i>
-                </div>
-                <h3 class="text-lg font-medium text-gray-900 mb-1">No employees found</h3>
-                <p class="text-gray-500 mb-6">Get started by adding your first employee.</p>
-                <button class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 inline-flex items-center shadow-sm hover:shadow-md" onclick="toggleTab('addEmployeeTab')">
-                    <i class="fas fa-user-plus mr-2"></i> Add Employee
-                </button>
-            </div>
-            @endif
-        </div>
-
-        <!-- Pagination -->
-        @if($employees->hasPages())
-        <div class="mt-6 flex items-center justify-between border-t border-gray-200 pt-5">
-            <div class="text-sm text-gray-700">
-                Showing {{ $employees->firstItem() }} to {{ $employees->lastItem() }} of {{ $employees->total() }} results
-            </div>
-            <div class="flex space-x-2">
-                @if($employees->onFirstPage())
-                <span class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-sm">Previous</span>
-                @else
-                <a href="{{ $employees->previousPageUrl() }}" class="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-green-600 hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Previous</a>
-                @endif
-                @if($employees->hasMorePages())
-                <a href="{{ $employees->nextPageUrl() }}" class="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-green-600 hover:bg-green-600 hover:text-white hover:border-green-600 transition-all duration-200">Next</a>
-                @else
-                <span class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-sm">Next</span>
-                @endif
+            <div class="p-4" id="paginationContainer">
+                {{ $employees->links() }}
             </div>
         </div>
-        @endif
+        @endfragment
     </div>
 
-    <!-- Add Employee Form Container -->
-<div id="addEmployeeFormContainer" class="hidden">
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 sm:p-8">
-        <h3 class="text-xl font-semibold text-green-600 flex items-center mb-6">
-            <i class="fas fa-user-plus mr-2"></i> Add New Employee
-        </h3>
-        <form action="{{ route('employees.store') }}" method="POST" class="space-y-6" id="addEmployeeForm">
-            @csrf
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="space-y-6">
-                    <h4 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">Personal Information</h4>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="name">Full Name</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-user text-gray-400 text-base"></i>
+    <!-- Add Employee Form -->
+    <div id="addEmployeeFormContainer" class="hidden">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <h3 class="text-lg font-medium text-gray-700 mb-4">Add New Employee</h3>
+            <form id="addEmployeeForm" action="{{ route('employees.store') }}" method="POST">
+                @csrf
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-medium text-gray-700 border-b pb-2">Personal Information</h4>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Full Name *</label>
+                            <input type="text" name="name" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                         </div>
-                        <input type="text" name="name" id="name" required
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="John Doe" aria-describedby="nameError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="nameError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Full Name is required
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="email">Email Address</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-envelope text-gray-400 text-base"></i>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Email Address *</label>
+                            <input type="email" name="email" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                         </div>
-                        <input type="email" name="email" id="email" required
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="john@company.com" aria-describedby="emailError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="emailError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Valid email is required
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="phone">Phone Number</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-phone text-gray-400 text-base"></i>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Phone Number</label>
+                            <input type="text" name="phone" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                         </div>
-                        <input type="text" name="phone" id="phone"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="+255 123 456 789">
-                    </div>
-
-                    <div>
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="gender">Gender</label>
-                        <select name="gender" id="gender"
-                                class="bg-gray-50 border border-gray-200 rounded-lg
-                                       focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                       block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                                aria-describedby="genderError">
-                            <option value="">Select Gender</option>
-                            <option value="male">Male</option>
-                            <option value="female">Female</option>
-                            <option value="other">Other</option>
-                        </select>
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="genderError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Gender is required
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="dob">Date of Birth</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-calendar-alt text-gray-400 text-base"></i>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Gender</label>
+                            <select name="gender" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                                <option value="">Select Gender</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
                         </div>
-                        <input type="text" name="dob" id="dob"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200 flatpickr"
-                               placeholder="Select date" aria-describedby="dobError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="dobError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Invalid date format
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="nationality">Nationality</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-globe text-gray-400 text-base"></i>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Date of Birth</label>
+                            <input type="date" name="dob" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                         </div>
-                        <input type="text" name="nationality" id="nationality"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="Tanzanian">
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="address">Address</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-map-marker-alt text-gray-400 text-base"></i>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Nationality</label>
+                            <input type="text" name="nationality" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                         </div>
-                        <input type="text" name="address" id="address"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="123 Main St, Dar es Salaam">
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Address</label>
+                            <input type="text" name="address" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-medium text-gray-700 border-b pb-2">Employment Information</h4>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Department *</label>
+                            <select name="department" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                                <option value="">Select Department</option>
+                                @foreach($departments as $dept)
+                                    <option value="{{ $dept->name }}">{{ $dept->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Position *</label>
+                            <input type="text" name="position" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Role *</label>
+                            <select name="role" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                                <option value="">Select Role</option>
+                                @foreach($roles as $role)
+                                    <option value="{{ $role->slug }}">{{ $role->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Employment Type *</label>
+                            <select name="employment_type" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                                <option value="">Select Type</option>
+                                <option value="full-time">Full Time</option>
+                                <option value="part-time">Part Time</option>
+                                <option value="contract">Contract</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Hire Date *</label>
+                            <input type="date" name="hire_date" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                        </div>
+                        <div id="contractEndDateContainer" class="hidden">
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Contract End Date *</label>
+                            <input type="date" name="contract_end_date" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Status *</label>
+                            <select name="status" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="terminated">Terminated</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="space-y-4 col-span-1 md:col-span-2">
+                        <h4 class="text-lg font-medium text-gray-700 border-b pb-2">Salary Information</h4>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Base Salary (TZS) *</label>
+                            <input type="number" name="base_salary" step="0.01" min="0" required class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                        </div>
+                        <div>
+                            <label class="block text-gray-600 text-sm font-medium mb-2">Allowances</label>
+                            <div class="space-y-2">
+                                @foreach($allowances as $allowance)
+                                    <label class="flex items-center">
+                                        <input type="checkbox" name="allowances[]" value="{{ $allowance->id }}" class="mr-2">
+                                        <span>{{ $allowance->name }} (TZS {{ number_format($allowance->amount, 0) }})</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-4 col-span-1 md:col-span-2">
+                        <h4 class="text-lg font-medium text-gray-700 border-b pb-2">Additional Information</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-gray-600 text-sm font-medium mb-2">Bank Name</label>
+                                <select name="bank_name" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                                    <option value="">Select Bank</option>
+                                    @foreach($banks as $bank)
+                                        <option value="{{ $bank->name }}">{{ $bank->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-600 text-sm font-medium mb-2">Account Number</label>
+                                <input type="text" name="account_number" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
+                            <div>
+                                <label class="block text-gray-600 text-sm font-medium mb-2">NSSF Number</label>
+                                <input type="text" name="nssf_number" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
+                            <div>
+                                <label class="block text-gray-600 text-sm font-medium mb-2">TIN Number</label>
+                                <input type="text" name="tin_number" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
+                            <div>
+                                <label class="block text-gray-600 text-sm font-medium mb-2">NHIF Number</label>
+                                <input type="text" name="nhif_number" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" onclick="switchToAllTab()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
+                    <button type="submit" id="addEmployeeSubmit" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+                        <i class="fas fa-save mr-2"></i> Save Employee
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Template Instructions Modal -->
+    <div id="templateInstructionsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg w-full max-w-4xl transform transition-all duration-300 scale-95 modal-content">
+            <div class="p-6 bg-green-50 border-b border-green-200">
+                <h3 class="text-xl font-semibold text-green-600 flex items-center">
+                    <i class="fas fa-file-download mr-2"></i> Import Template Instructions
+                </h3>
+                <button type="button" onclick="closeModal('templateInstructionsModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition-all duration-200" aria-label="Close template instructions modal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fas fa-info-circle text-blue-500 text-lg mt-1 mr-3"></i>
+                        <div>
+                            <h4 class="font-medium text-blue-800 mb-1">Important Notes</h4>
+                            <p class="text-blue-700 text-sm">The template is an Excel sheet for bulk importing employees. Fill in the following columns carefully to ensure successful import.</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="space-y-6">
-                    <h4 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">Employment Details</h4>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="employee_id">Employee ID</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-id-badge text-gray-400 text-base"></i>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-800 mb-3">Required Fields</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">name</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">email</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">department</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">position</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">employment_type</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">hire_date</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">base_salary</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">role</span>
+                                <span class="text-red-500 text-sm font-medium">Required</span>
+                            </div>
                         </div>
-                        <input type="text" name="employee_id" id="employee_id" required
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="EMP-001" aria-describedby="employeeIdError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="employeeIdError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Employee ID is required
-                        </span>
                     </div>
 
                     <div>
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="department">Department</label>
-                        <select name="department" id="department"
-                                class="bg-gray-50 border border-gray-200 rounded-lg
-                                       focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                       block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                                required aria-describedby="departmentError">
-                            <option value="">Select Department</option>
-                            @if(isset($departments) && $departments->isNotEmpty())
-                                @foreach($departments as $department)
-                                    <option value="{{ $department->name }}">{{ $department->name }}</option>
-                                @endforeach
-                            @else
-                                <option value="IT">IT</option>
-                                <option value="HR">HR</option>
-                                <option value="Finance">Finance</option>
-                                <option value="Marketing">Marketing</option>
-                                <option value="Operations">Operations</option>
-                            @endif
-                        </select>
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="departmentError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Department is required
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="position">Position</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-briefcase text-gray-400 text-base"></i>
+                        <h4 class="text-lg font-medium text-gray-800 mb-3">Optional Fields</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">phone</span>
+                                <span class="text-green-500 text-sm font-medium">Optional</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">gender</span>
+                                <span class="text-green-500 text-sm font-medium">Optional</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">dob</span>
+                                <span class="text-green-500 text-sm font-medium">Optional</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">nationality</span>
+                                <span class="text-green-500 text-sm font-medium">Optional</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">address</span>
+                                <span class="text-green-500 text-sm font-medium">Optional</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">bank_name</span>
+                                <span class="text-green-500 text-sm font-medium">Optional</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="font-medium text-gray-700">account_number</span>
+                                <span class="text-green-500 text-sm font-medium">Optional</span>
+                            </div>
                         </div>
-                        <input type="text" name="position" id="position" required
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="Software Developer" aria-describedby="positionError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="positionError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Position is required
-                        </span>
-                    </div>
-
-                    <div>
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="role">Role</label>
-                        <select name="role" id="role"
-                                class="bg-gray-50 border border-gray-200 rounded-lg
-                                       focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                       block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                                required aria-describedby="roleError">
-                            <option value="">Select Role</option>
-                            <option value="admin">Admin</option>
-                            <option value="hr">HR</option>
-                            <option value="manager">Manager</option>
-                            <option value="employee">Employee</option>
-                        </select>
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="roleError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Role is required
-                        </span>
-                    </div>
-
-                    <div>
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="employment_type">Employment Type</label>
-                        <select name="employment_type" id="employment_type"
-                                class="bg-gray-50 border border-gray-200 rounded-lg
-                                       focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                       block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                                required aria-describedby="employmentTypeError">
-                            <option value="">Select Type</option>
-                            <option value="full-time">Full-Time</option>
-                            <option value="part-time">Part-Time</option>
-                            <option value="contract">Contract</option>
-                        </select>
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="employmentTypeError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Employment Type is required
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="hire_date">Hire Date</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-calendar-alt text-gray-400 text-base"></i>
-                        </div>
-                        <input type="text" name="hire_date" id="hire_date" required
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200 flatpickr"
-                               placeholder="Select date" aria-describedby="hireDateError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="hireDateError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Hire Date is required
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="contract_end_date">Contract End Date</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-calendar-alt text-gray-400 text-base"></i>
-                        </div>
-                        <input type="text" name="contract_end_date" id="contract_end_date"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200 flatpickr"
-                               placeholder="Select date" aria-describedby="contractEndDateError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="contractEndDateError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Invalid date format
-                        </span>
                     </div>
                 </div>
 
-                <div class="space-y-6">
-                    <h4 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">Banking & Compliance</h4>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="base_salary">Base Salary (TZS)</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-money-bill text-gray-400 text-base"></i>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-yellow-500 text-lg mt-1 mr-3"></i>
+                        <div>
+                            <h4 class="font-medium text-yellow-800 mb-1">Special Notes</h4>
+                            <ul class="text-yellow-700 text-sm space-y-1">
+                                <li>• Employee ID is generated automatically during import</li>
+                                <li>• For contract employees, contract_end_date is required</li>
+                                <li>• Date formats should be YYYY-MM-DD (e.g., 2023-01-15)</li>
+                                <li>• Department names must exist in the system</li>
+                                <li>• Role slugs must exist in the roles table</li>
+                            </ul>
                         </div>
-                        <input type="number" name="base_salary" id="base_salary" required
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="5000000" aria-describedby="baseSalaryError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="baseSalaryError">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Base Salary is required
-                        </span>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="allowances">Allowances (TZS)</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-money-bill text-gray-400 text-base"></i>
-                        </div>
-                        <input type="number" name="allowances" id="allowances"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="1000000">
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="deductions">Deductions (TZS)</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-money-bill text-gray-400 text-base"></i>
-                        </div>
-                        <input type="number" name="deductions" id="deductions"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="500000">
-                    </div>
-
-                    <div>
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="bank_name">Bank Name</label>
-                        <select name="bank_name" id="bank_name"
-                                class="bg-gray-50 border border-gray-200 rounded-lg
-                                       focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                       block w-full py-2.5 px-3 leading-6 transition-all duration-200">
-                            <option value="">Select Bank (Optional)</option>
-                            @if(isset($banks) && $banks->isNotEmpty())
-                                @foreach($banks as $bank)
-                                    <option value="{{ $bank->name }}">{{ $bank->name }}</option>
-                                @endforeach
-                            @else
-                                <option value="CRDB Bank">CRDB Bank</option>
-                                <option value="NMB Bank">NMB Bank</option>
-                                <option value="Standard Chartered">Standard Chartered</option>
-                                <option value="Stanbic Bank">Stanbic Bank</option>
-                                <option value="NBC Bank">NBC Bank</option>
-                            @endif
-                        </select>
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="account_number">Account Number</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-university text-gray-400 text-base"></i>
-                        </div>
-                        <input type="text" name="account_number" id="account_number"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="0152286559700">
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="nssf_number">NSSF Number</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-id-card text-gray-400 text-base"></i>
-                        </div>
-                        <input type="text" name="nssf_number" id="nssf_number"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="NSSF123456">
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="nhif_number">NHIF Number</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-id-card text-gray-400 text-base"></i>
-                        </div>
-                        <input type="text" name="nhif_number" id="nhif_number"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="NHIF123456">
-                    </div>
-
-                    <div class="relative">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="tin_number">TIN Number</label>
-                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                            <i class="fas fa-id-card text-gray-400 text-base"></i>
-                        </div>
-                        <input type="text" name="tin_number" id="tin_number"
-                               class="pl-10 bg-gray-50 border border-gray-200 rounded-lg
-                                      focus:ring-2 focus:ring-green-500 focus:border-green-500
-                                      block w-full py-2.5 px-3 leading-6 transition-all duration-200"
-                               placeholder="TIN123456789">
                     </div>
                 </div>
             </div>
-
-            <div class="flex justify-end space-x-3 mt-6">
-                <button type="button"
-                        class="text-white bg-gradient-to-r from-gray-500 to-gray-600
-                               hover:from-gray-600 hover:to-gray-700 focus:ring-4 focus:ring-gray-300
-                               font-medium rounded-lg text-sm px-5 py-2.5 text-center
-                               transition-all duration-200 flex items-center"
-                        onclick="toggleTab('allEmployeesTab')">
-                    <i class="fas fa-times mr-2"></i> Cancel
+            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end space-x-3">
+                <button type="button" onclick="closeModal('templateInstructionsModal')" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200">
+                    Close
                 </button>
-                <button type="submit"
-                        class="text-white bg-gradient-to-r from-green-600 to-green-700
-                               hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300
-                               font-medium rounded-lg text-sm px-5 py-2.5 text-center
-                               transition-all duration-200 flex items-center">
-                    <i class="fas fa-check mr-2"></i> Add Employee
-                </button>
+                <a href="{{ route('employees.download-template') }}" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center">
+                    <i class="fas fa-download mr-2"></i> Download Template
+                </a>
             </div>
-        </form>
+        </div>
     </div>
-</div>
 
-
-
-    <!-- Bulk Import Modal -->
+    <!-- Bulk Import Modal with Drag & Drop -->
     <div id="bulkImportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-white rounded-lg w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
             <div class="p-6 bg-green-50 border-b border-green-200">
@@ -555,30 +504,133 @@
                 </button>
             </div>
             <div class="p-6">
-                <form action="{{ route('employees.bulk-import') }}" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <form id="bulkImportForm" action="{{ route('employees.bulk-import') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
                     @csrf
-                    <div class="mb-4">
-                        <label class="block text-gray-600 text-sm font-medium mb-2" for="csv_file">Upload CSV File</label>
-                        <input type="file" name="csv_file" id="csv_file" accept=".csv" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" aria-describedby="csvFileError">
-                        <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="csvFileError"><i class="fas fa-exclamation-circle mr-1"></i> CSV file is required</span>
-                        <p class="text-gray-500 text-sm mt-2">The CSV should have columns: name, employee_id, email, department, position, role, employment_type, hire_date, contract_end_date, base_salary, allowances, deductions, bank_name, account_number, nssf_number, nhif_number, tin_number, phone, gender, dob, nationality, address, status</p>
+                    
+                    <!-- Drag & Drop Area -->
+                    <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center transition-all duration-300 hover:border-green-400 hover:bg-green-50">
+                        <div class="flex flex-col items-center justify-center space-y-4">
+                            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-cloud-upload-alt text-green-500 text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-lg font-medium text-gray-700 mb-1">Drop your file here</p>
+                                <p class="text-sm text-gray-500">or click to browse</p>
+                            </div>
+                            <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" class="hidden" required>
+                            <button type="button" onclick="document.getElementById('fileInput').click()" class="px-6 py-2 text-sm font-medium text-green-600 bg-green-100 rounded-lg hover:bg-green-200 transition-all duration-200">
+                                Choose File
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex justify-end space-x-3">
-                        <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center" onclick="closeModal('bulkImportModal')">
-                            <i class="fas fa-times mr-2"></i> Cancel
-                        </button>
-                        <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center">
-                            <i class="fas fa-upload mr-2"></i> Import
-                        </button>
+
+                    <!-- File Info -->
+                    <div id="fileInfo" class="hidden bg-gray-50 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-file-excel text-green-500 text-xl"></i>
+                                <div>
+                                    <p id="fileName" class="font-medium text-gray-800"></p>
+                                    <p id="fileSize" class="text-sm text-gray-500"></p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="removeFile()" class="text-red-500 hover:text-red-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Supported Formats -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-blue-500 text-lg mt-1 mr-3"></i>
+                            <div>
+                                <h4 class="font-medium text-blue-800 mb-1">Supported Formats</h4>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-700 border border-blue-200">
+                                        <i class="fas fa-file-excel mr-1.5"></i> XLSX
+                                    </span>
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-700 border border-blue-200">
+                                        <i class="fas fa-file-excel mr-1.5"></i> XLS
+                                    </span>
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white text-blue-700 border border-blue-200">
+                                        <i class="fas fa-file-csv mr-1.5"></i> CSV
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </form>
+            </div>
+            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end space-x-3">
+                <button type="button" onclick="closeModal('bulkImportModal')" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200">
+                    Cancel
+                </button>
+                <button type="submit" form="bulkImportForm" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center">
+                    <i class="fas fa-upload mr-2"></i> Import Employees
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Confirm Modal -->
+    <div id="statusConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg w-full max-w-md transform transition-all duration-300 scale-95 modal-content">
+            <div class="p-6 bg-green-50 border-b border-green-200">
+                <h3 class="text-xl font-semibold text-gray-800">Confirm Status Change</h3>
+                <button type="button" onclick="closeModal('statusConfirmModal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition-all duration-200" aria-label="Close status confirmation modal">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mx-auto mb-4">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl"></i>
+                </div>
+                <p id="statusConfirmMessage" class="text-center text-gray-700 mb-2 text-lg font-medium"></p>
+                <p class="text-center text-gray-500 text-sm">This action will immediately update the employee's status in the system.</p>
+            </div>
+            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end space-x-3">
+                <button onclick="closeModal('statusConfirmModal')" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200">
+                    Cancel
+                </button>
+                <button id="confirmStatusAction" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200">
+                    Confirm Change
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Employee Modal -->
+    <div id="viewEmployeeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg w-full max-w-4xl transform transition-all duration-300 scale-95 modal-content">
+            <div class="p-6 bg-green-50 border-b border-green-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-semibold text-green-600 flex items-center">
+                        <i class="fas fa-eye mr-2"></i> Employee Details
+                    </h3>
+                    <button type="button" onclick="closeModal('viewEmployeeModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition-all duration-200" aria-label="Close view employee modal">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 max-h-[70vh] overflow-y-auto">
+                <div id="viewEmployeeContent"></div>
+            </div>
+            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end">
+                <button onclick="closeModal('viewEmployeeModal')" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200">
+                    Close
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Edit Employee Modal -->
     <div id="editEmployeeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-lg w-full max-w-4xl transform transition-all duration-300 scale-95 modal-content">
+        <div class="bg-white rounded-lg w-[95%] max-w-[95%] transform transition-all duration-300 scale-95 modal-content">
             <div class="p-6 bg-green-50 border-b border-green-200">
                 <div class="flex justify-between items-center">
                     <h3 class="text-xl font-semibold text-green-600 flex items-center">
@@ -591,477 +643,25 @@
                     </button>
                 </div>
             </div>
-            <div class="p-6 max-h-[70vh] overflow-y-auto">
-                <form id="editEmployeeForm" method="POST" class="space-y-6">
-                    @csrf
-                    @method('PUT')
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <!-- Personal Information -->
-                        <div class="space-y-6">
-                            <h4 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">Personal Information</h4>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_name">Full Name</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-user text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_name" name="name" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editNameError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editNameError"><i class="fas fa-exclamation-circle mr-1"></i> Full Name is required</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_email">Email Address</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-envelope text-gray-400"></i>
-                                </div>
-                                <input type="email" id="edit_email" name="email" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editEmailError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editEmailError"><i class="fas fa-exclamation-circle mr-1"></i> Valid email is required</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_phone">Phone Number</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-phone text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_phone" name="phone" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                            <div>
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_gender">Gender</label>
-                                <select id="edit_gender" name="gender" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" aria-describedby="editGenderError">
-                                    <option value="">Select Gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                    <option value="other">Other</option>
-                                </select>
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editGenderError"><i class="fas fa-exclamation-circle mr-1"></i> Gender is required</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_dob">Date of Birth</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-calendar-alt text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_dob" name="dob" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200 flatpickr" placeholder="Select date" aria-describedby="editDobError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editDobError"><i class="fas fa-exclamation-circle mr-1"></i> Invalid date format</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_nationality">Nationality</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-globe text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_nationality" name="nationality" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_address">Address</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-map-marker-alt text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_address" name="address" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                        </div>
-                        <!-- Employment Details -->
-                        <div class="space-y-6">
-                            <h4 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">Employment Details</h4>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_employee_id">Employee ID</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-id-badge text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_employee_id" name="employee_id" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editEmployeeIdError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editEmployeeIdError"><i class="fas fa-exclamation-circle mr-1"></i> Employee ID is required</span>
-                            </div>
-                            <div>
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_department">Department</label>
-                                <select id="edit_department" name="department" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editDepartmentError">
-                                    <option value="">Select Department</option>
-                                    <!-- Populated dynamically via JavaScript -->
-                                </select>
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editDepartmentError"><i class="fas fa-exclamation-circle mr-1"></i> Department is required</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_position">Position</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-briefcase text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_position" name="position" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editPositionError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editPositionError"><i class="fas fa-exclamation-circle mr-1"></i> Position is required</span>
-                            </div>
-                            <div>
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_role">Role</label>
-                                <select id="edit_role" name="role" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editRoleError">
-                                    <option value="">Select Role</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="hr">HR</option>
-                                    <option value="manager">Manager</option>
-                                    <option value="employee">Employee</option>
-                                </select>
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editRoleError"><i class="fas fa-exclamation-circle mr-1"></i> Role is required</span>
-                            </div>
-                            <div>
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_employment_type">Employment Type</label>
-                                <select id="edit_employment_type" name="employment_type" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editEmploymentTypeError">
-                                    <option value="">Select Type</option>
-                                    <option value="full-time">Full-Time</option>
-                                    <option value="part-time">Part-Time</option>
-                                    <option value="contract">Contract</option>
-                                </select>
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editEmploymentTypeError"><i class="fas fa-exclamation-circle mr-1"></i> Employment Type is required</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_hire_date">Hire Date</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-calendar-alt text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_hire_date" name="hire_date" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200 flatpickr" required aria-describedby="editHireDateError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editHireDateError"><i class="fas fa-exclamation-circle mr-1"></i> Hire Date is required</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_contract_end_date">Contract End Date</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-calendar-alt text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_contract_end_date" name="contract_end_date" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200 flatpickr" aria-describedby="editContractEndDateError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editContractEndDateError"><i class="fas fa-exclamation-circle mr-1"></i> Invalid date format</span>
-                            </div>
-                            <div>
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_status">Status</label>
-                                <select id="edit_status" name="status" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editStatusError">
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                    <option value="terminated">Terminated</option>
-                                </select>
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editStatusError"><i class="fas fa-exclamation-circle mr-1"></i> Status is required</span>
-                            </div>
-                        </div>
-                        <!-- Banking & Compliance -->
-                        <div class="space-y-6">
-                            <h4 class="text-lg font-medium text-gray-700 border-b border-gray-200 pb-2">Banking & Compliance</h4>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_base_salary">Base Salary (TZS)</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-money-bill text-gray-400"></i>
-                                </div>
-                                <input type="number" id="edit_base_salary" name="base_salary" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required aria-describedby="editBaseSalaryError">
-                                <span class="text-red-500 text-sm flex items-center mt-1 hidden" id="editBaseSalaryError"><i class="fas fa-exclamation-circle mr-1"></i> Base Salary is required</span>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_allowances">Allowances (TZS)</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-money-bill text-gray-400"></i>
-                                </div>
-                                <input type="number" id="edit_allowances" name="allowances" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_deductions">Deductions (TZS)</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-money-bill text-gray-400"></i>
-                                </div>
-                                <input type="number" id="edit_deductions" name="deductions" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                            <div>
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_bank_name">Bank Name</label>
-                                <select id="edit_bank_name" name="bank_name" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                                    <option value="">Select Bank (Optional)</option>
-                                    <!-- Populated dynamically via JavaScript -->
-                                </select>
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_account_number">Account Number</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-university text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_account_number" name="account_number" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_nssf_number">NSSF Number</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-id-card text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_nssf_number" name="nssf_number" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_nhif_number">NHIF Number</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-id-card text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_nhif_number" name="nhif_number" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                            <div class="relative">
-                                <label class="block text-gray-600 text-sm font-medium mb-2" for="edit_tin_number">TIN Number</label>
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i class="fas fa-id-card text-gray-400"></i>
-                                </div>
-                                <input type="text" id="edit_tin_number" name="tin_number" class="pl-10 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center" onclick="closeModal('editEmployeeModal')">
-                            <i class="fas fa-times mr-2"></i> Cancel
-                        </button>
-                        <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center">
-                            <i class="fas fa-check mr-2"></i> Update Employee
-                        </button>
-                    </div>
-                </form>
+            <div class="p-6 max-h-[80vh] overflow-y-auto">
+                <div id="editEmployeeContent"></div>
+            </div>
+            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-end space-x-3">
+                <button type="button" onclick="closeModal('editEmployeeModal')" class="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200">
+                    Cancel
+                </button>
+                <button type="submit" form="editEmployeeForm" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center">
+                    <i class="fas fa-check mr-2"></i> Save Changes
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteEmployeeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-lg w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
-            <div class="p-6 bg-green-50 border-b border-green-200">
-                <div class="flex justify-between items-center">
-                    <h3 class="text-xl font-semibold text-red-600 flex items-center">
-                        <i class="fas fa-exclamation-triangle mr-2"></i> Confirm Deletion
-                    </h3>
-                    <button type="button" onclick="closeModal('deleteEmployeeModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition-all duration-200" aria-label="Close delete confirmation modal">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="p-6">
-                <div class="text-center">
-                    <i class="fas fa-exclamation-circle text-red-500 text-4xl mb-4"></i>
-                    <p class="text-gray-700 text-lg font-medium mb-2">Are you sure you want to delete this employee?</p>
-                    <p class="text-gray-500 text-sm">This action cannot be undone. All associated data will be permanently removed.</p>
-                </div>
-                <div class="flex justify-center space-x-3 mt-6">
-                    <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center" onclick="closeModal('deleteEmployeeModal')">
-                        <i class="fas fa-times mr-2"></i> Cancel
-                    </button>
-                    <button id="confirmDeleteButton" class="text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center">
-                        <i class="fas fa-trash mr-2"></i> Delete
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Flatpickr CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
-    <!-- Flatpickr JS -->
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
-
+    <!-- JavaScript -->
     <script>
-        let currentDeleteId = null;
-
-        // Initialize Flatpickr for date inputs
-        document.addEventListener('DOMContentLoaded', function() {
-            flatpickr('.flatpickr', {
-                dateFormat: 'Y-m-d',
-                allowInput: true,
-                altInput: true,
-                altFormat: 'F j, Y', // Display format: e.g., September 10, 2025
-                maxDate: ['dob', 'edit_dob'].includes(this.id) ? 'today' : null, // Restrict DOB to past/present
-                wrap: false,
-                onReady: function(selectedDates, dateStr, instance) {
-                    instance.element.style.cursor = 'pointer';
-                }
-            });
-
-            // Tab navigation
-            document.getElementById('allEmployeesTab').addEventListener('click', () => toggleTab('allEmployeesTab'));
-            document.getElementById('addEmployeeTab').addEventListener('click', () => toggleTab('addEmployeeTab'));
-
-            // Form validation for Add Employee
-            document.getElementById('addEmployeeForm').addEventListener('submit', function(e) {
-                let valid = true;
-                const fields = [
-                    { id: 'name', errorId: 'nameError', message: 'Full Name is required' },
-                    { id: 'employee_id', errorId: 'employeeIdError', message: 'Employee ID is required' },
-                    { id: 'email', errorId: 'emailError', message: 'Valid email is required' },
-                    { id: 'department', errorId: 'departmentError', message: 'Department is required' },
-                    { id: 'position', errorId: 'positionError', message: 'Position is required' },
-                    { id: 'role', errorId: 'roleError', message: 'Role is required' },
-                    { id: 'base_salary', errorId: 'baseSalaryError', message: 'Base Salary is required' },
-                    { id: 'employment_type', errorId: 'employmentTypeError', message: 'Employment Type is required' },
-                    { id: 'hire_date', errorId: 'hireDateError', message: 'Hire Date is required' }
-                ];
-
-                fields.forEach(field => {
-                    const input = document.getElementById(field.id);
-                    const error = document.getElementById(field.errorId);
-                    if (!input.value.trim()) {
-                        error.classList.remove('hidden');
-                        valid = false;
-                    } else {
-                        error.classList.add('hidden');
-                    }
-                });
-
-                const email = document.getElementById('email');
-                const emailError = document.getElementById('emailError');
-                if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-                    emailError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    emailError.classList.add('hidden');
-                }
-
-                const dob = document.getElementById('dob');
-                const dobError = document.getElementById('dobError');
-                if (dob.value && !/^\d{4}-\d{2}-\d{2}$/.test(dob.value)) {
-                    dobError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    dobError.classList.add('hidden');
-                }
-
-                const contractEndDate = document.getElementById('contract_end_date');
-                const contractEndDateError = document.getElementById('contractEndDateError');
-                if (contractEndDate.value && !/^\d{4}-\d{2}-\d{2}$/.test(contractEndDate.value)) {
-                    contractEndDateError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    contractEndDateError.classList.add('hidden');
-                }
-
-                if (!valid) {
-                    e.preventDefault();
-                }
-            });
-
-            // Form validation for Edit Employee
-            document.getElementById('editEmployeeForm').addEventListener('submit', function(e) {
-                let valid = true;
-                const fields = [
-                    { id: 'edit_name', errorId: 'editNameError', message: 'Full Name is required' },
-                    { id: 'edit_employee_id', errorId: 'editEmployeeIdError', message: 'Employee ID is required' },
-                    { id: 'edit_email', errorId: 'editEmailError', message: 'Valid email is required' },
-                    { id: 'edit_department', errorId: 'editDepartmentError', message: 'Department is required' },
-                    { id: 'edit_position', errorId: 'editPositionError', message: 'Position is required' },
-                    { id: 'edit_role', errorId: 'editRoleError', message: 'Role is required' },
-                    { id: 'edit_base_salary', errorId: 'editBaseSalaryError', message: 'Base Salary is required' },
-                    { id: 'edit_employment_type', errorId: 'editEmploymentTypeError', message: 'Employment Type is required' },
-                    { id: 'edit_hire_date', errorId: 'editHireDateError', message: 'Hire Date is required' },
-                    { id: 'edit_status', errorId: 'editStatusError', message: 'Status is required' }
-                ];
-
-                fields.forEach(field => {
-                    const input = document.getElementById(field.id);
-                    const error = document.getElementById(field.errorId);
-                    if (!input.value.trim()) {
-                        error.classList.remove('hidden');
-                        valid = false;
-                    } else {
-                        error.classList.add('hidden');
-                    }
-                });
-
-                const email = document.getElementById('edit_email');
-                const emailError = document.getElementById('editEmailError');
-                if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-                    emailError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    emailError.classList.add('hidden');
-                }
-
-                const dob = document.getElementById('edit_dob');
-                const dobError = document.getElementById('editDobError');
-                if (dob.value && !/^\d{4}-\d{2}-\d{2}$/.test(dob.value)) {
-                    dobError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    dobError.classList.add('hidden');
-                }
-
-                const contractEndDate = document.getElementById('edit_contract_end_date');
-                const contractEndDateError = document.getElementById('editContractEndDateError');
-                if (contractEndDate.value && !/^\d{4}-\d{2}-\d{2}$/.test(contractEndDate.value)) {
-                    contractEndDateError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    contractEndDateError.classList.add('hidden');
-                }
-
-                if (!valid) {
-                    e.preventDefault();
-                }
-            });
-
-            // Delete button
-            const confirmDeleteButton = document.getElementById('confirmDeleteButton');
-            if (confirmDeleteButton) {
-                confirmDeleteButton.addEventListener('click', function() {
-                    if (currentDeleteId) {
-                        deleteEmployee(currentDeleteId);
-                    }
-                });
-            }
-
-            // Search functionality
-            const searchInput = document.getElementById('searchEmployee');
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    const searchValue = this.value.toLowerCase();
-                    const rows = document.querySelectorAll('.employee-row');
-                    rows.forEach(row => {
-                        const name = row.dataset.name || '';
-                        const id = row.dataset.id || '';
-                        const matches = name.includes(searchValue) || id.includes(searchValue);
-                        row.style.display = matches ? '' : 'none';
-                    });
-                });
-            }
-
-            // Reset form on cancel or tab switch
-            document.querySelectorAll('#addEmployeeForm button[type="button"]').forEach(button => {
-                button.addEventListener('click', () => {
-                    document.getElementById('addEmployeeForm').reset();
-                    document.querySelectorAll('#addEmployeeForm .text-red-500').forEach(error => error.classList.add('hidden'));
-                    document.querySelectorAll('#addEmployeeForm .flatpickr').forEach(input => {
-                        if (input._flatpickr) input._flatpickr.clear();
-                    });
-                });
-            });
-
-            document.querySelectorAll('#editEmployeeModal button[onclick*="closeModal"]').forEach(button => {
-                button.addEventListener('click', () => {
-                    document.getElementById('editEmployeeForm').reset();
-                    document.querySelectorAll('#editEmployeeForm .text-red-500').forEach(error => error.classList.add('hidden'));
-                    document.querySelectorAll('#editEmployeeForm .flatpickr').forEach(input => {
-                        if (input._flatpickr) input._flatpickr.clear();
-                    });
-                });
-            });
-
-            // Reset Add Employee form when switching to the tab
-            document.getElementById('addEmployeeTab').addEventListener('click', () => {
-                document.getElementById('addEmployeeForm').reset();
-                document.querySelectorAll('#addEmployeeForm .text-red-500').forEach(error => error.classList.add('hidden'));
-                document.querySelectorAll('#addEmployeeForm .flatpickr').forEach(input => {
-                    if (input._flatpickr) input._flatpickr.clear();
-                });
-            });
-        });
-
-        function toggleTab(tabId) {
-            const tabs = ['allEmployeesTab', 'addEmployeeTab'];
-            const containers = ['employeesTableContainer', 'addEmployeeFormContainer'];
-
-            tabs.forEach(id => {
-                const tab = document.getElementById(id);
-                tab.classList.remove('bg-green-600', 'text-white');
-                tab.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
-                tab.setAttribute('aria-selected', 'false');
-            });
-
-            containers.forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-            });
-
-            const activeTab = document.getElementById(tabId);
-            activeTab.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
-            activeTab.classList.add('bg-green-600', 'text-white');
-            activeTab.setAttribute('aria-selected', 'true');
-
-            const containerId = tabId === 'allEmployeesTab' ? 'employeesTableContainer' : 'addEmployeeFormContainer';
-            document.getElementById(containerId).classList.remove('hidden');
-        }
-
-        function openModal(id) {
-            const modal = document.getElementById(id);
+        // Modal Functions
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
             if (modal) {
                 modal.classList.remove('hidden');
                 setTimeout(() => {
@@ -1074,9 +674,8 @@
             }
         }
 
-
-        function closeModal(id) {
-            const modal = document.getElementById(id);
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
             if (modal) {
                 const modalContent = modal.querySelector('.modal-content');
                 if (modalContent) {
@@ -1089,216 +688,435 @@
             }
         }
 
-        function editEmployee(id) {
-            fetch(`/dashboard/employee/${id}/edit`)
-                .then(res => {
-                    if (!res.ok) throw new Error('Failed to fetch employee data');
-                    return res.json();
-                })
-                .then(data => {
-                    ['name', 'employee_id', 'email', 'department', 'position', 'role', 'employment_type', 'hire_date', 'contract_end_date', 'base_salary', 'allowances', 'deductions', 'bank_name', 'account_number', 'nssf_number', 'nhif_number', 'tin_number', 'phone', 'gender', 'dob', 'nationality', 'address', 'status'].forEach(f => {
-                        const element = document.getElementById(`edit_${f}`);
-                        if (element) {
-                            element.value = data[f] || '';
+        // Drag & Drop Functionality
+        function initializeDragAndDrop() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileName = document.getElementById('fileName');
+            const fileSize = document.getElementById('fileSize');
+
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+
+            // Highlight drop zone when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            // Handle dropped files
+            dropZone.addEventListener('drop', handleDrop, false);
+
+            // Handle file input change
+            fileInput.addEventListener('change', handleFileSelect, false);
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function highlight() {
+                dropZone.classList.add('border-green-400', 'bg-green-50');
+            }
+
+            function unhighlight() {
+                dropZone.classList.remove('border-green-400', 'bg-green-50');
+            }
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+
+            function handleFileSelect(e) {
+                const files = e.target.files;
+                handleFiles(files);
+            }
+
+            function handleFiles(files) {
+                if (files.length > 0) {
+                    const file = files[0];
+                    if (isValidFileType(file)) {
+                        displayFileInfo(file);
+                        fileInput.files = files;
+                    } else {
+                        showErrorModal('Please select a valid file type (XLSX, XLS, or CSV).');
+                    }
+                }
+            }
+
+            function isValidFileType(file) {
+                const validTypes = [
+                    'application/vnd.ms-excel',
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'text/csv'
+                ];
+                const validExtensions = ['.xlsx', '.xls', '.csv'];
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                
+                return validTypes.includes(file.type) || validExtensions.includes(fileExtension);
+            }
+
+            function displayFileInfo(file) {
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.classList.remove('hidden');
+                dropZone.classList.add('hidden');
+            }
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        }
+
+        function removeFile() {
+            const fileInput = document.getElementById('fileInput');
+            const fileInfo = document.getElementById('fileInfo');
+            const dropZone = document.getElementById('dropZone');
+            
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+        }
+
+        // Tab Switching
+        function switchToAllTab() {
+            document.getElementById('employeesTableContainer').classList.remove('hidden');
+            document.getElementById('addEmployeeFormContainer').classList.add('hidden');
+            document.getElementById('allEmployeesTab').classList.add('bg-green-600', 'text-white');
+            document.getElementById('allEmployeesTab').classList.remove('bg-gray-100', 'text-gray-700');
+            document.getElementById('addEmployeeTab').classList.add('bg-gray-100', 'text-gray-700');
+            document.getElementById('addEmployeeTab').classList.remove('bg-green-600', 'text-white');
+        }
+
+        function switchToAddTab() {
+            document.getElementById('employeesTableContainer').classList.add('hidden');
+            document.getElementById('addEmployeeFormContainer').classList.remove('hidden');
+            document.getElementById('addEmployeeTab').classList.add('bg-green-600', 'text-white');
+            document.getElementById('addEmployeeTab').classList.remove('bg-gray-100', 'text-gray-700');
+            document.getElementById('allEmployeesTab').classList.add('bg-gray-100', 'text-gray-700');
+            document.getElementById('allEmployeesTab').classList.remove('bg-green-600', 'text-white');
+        }
+
+        // Filter and Sort Functions (AJAX)
+        function filterTable(page = 1) {
+            const search = document.getElementById('searchEmployee').value;
+            const dept = document.getElementById('departmentFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const sort = document.querySelector('[data-sort-column]')?.dataset.sortColumn || 'name';
+            const direction = document.querySelector('[data-sort-column="' + sort + '"]')?.dataset.sortDirection === 'asc' ? 'desc' : 'asc';
+
+            const params = new URLSearchParams({
+                search: search,
+                department: dept,
+                status: status,
+                sort: sort,
+                direction: direction,
+                page: page,
+                ajax: 1
+            });
+
+            fetch(window.location.pathname + '?' + params.toString(), {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newTableBody = doc.querySelector('#employeesTableBody');
+                const newPagination = doc.querySelector('#paginationContainer');
+                if (newTableBody) {
+                    document.getElementById('employeesTableBody').innerHTML = newTableBody.innerHTML;
+                }
+                if (newPagination) {
+                    document.getElementById('paginationContainer').innerHTML = newPagination.innerHTML;
+                }
+                attachPaginationListeners();
+                updateSortIndicators(sort, direction);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showErrorModal('Failed to load employees.');
+            });
+        }
+
+        function sortTable(column) {
+            const currentSort = document.querySelector('[data-sort-column="' + column + '"]')?.dataset.sortColumn || 'name';
+            const currentDirection = document.querySelector('[data-sort-column="' + column + '"]')?.dataset.sortDirection || 'asc';
+            const newDirection = (currentSort === column && currentDirection === 'asc') ? 'desc' : 'asc';
+            
+            document.querySelectorAll('[data-sort-column]').forEach(th => {
+                th.dataset.sortDirection = 'asc';
+            });
+            document.querySelector('[data-sort-column="' + column + '"]').dataset.sortDirection = newDirection;
+            
+            filterTable();
+        }
+
+        function updateSortIndicators(sort, direction) {
+            document.querySelectorAll('[data-sort-column]').forEach(th => {
+                const icon = th.querySelector('.fas.fa-sort');
+                if (icon) {
+                    icon.classList.remove('fa-sort-up', 'fa-sort-down');
+                    if (th.dataset.sortColumn === sort) {
+                        icon.classList.add(direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down');
+                    } else {
+                        icon.classList.add('fa-sort');
+                    }
+                }
+            });
+        }
+
+        function clearFilters() {
+            document.getElementById('searchEmployee').value = '';
+            document.getElementById('departmentFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            filterTable();
+        }
+
+        function attachPaginationListeners() {
+            const paginationLinks = document.querySelectorAll('.pagination a');
+            paginationLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const url = new URL(this.href);
+                    const page = url.searchParams.get('page') || 1;
+                    filterTable(page);
+                });
+            });
+        }
+
+        function debounce(func, delay) {
+            let timeout;
+            return function() {
+                clearTimeout(timeout);
+                timeout = setTimeout(func, delay);
+            };
+        }
+
+        const debouncedFilter = debounce(filterTable, 300);
+
+        // Quick Actions Functions
+        function exportEmployees() {
+            window.location.href = '{{ route('employees.export') }}';
+        }
+
+        function downloadTemplate() {
+            openModal('templateInstructionsModal');
+        }
+
+        // Handle Employment Type Change
+        function handleEmploymentTypeChange(form) {
+            const employmentTypeSelect = form.querySelector('select[name="employment_type"]');
+            const contractEndDateContainer = form.querySelector('#contractEndDateContainer');
+            
+            if (employmentTypeSelect && contractEndDateContainer) {
+                employmentTypeSelect.addEventListener('change', function() {
+                    if (this.value === 'contract') {
+                        contractEndDateContainer.classList.remove('hidden');
+                        const input = contractEndDateContainer.querySelector('input[name="contract_end_date"]');
+                        if (input) input.setAttribute('required', 'required');
+                    } else {
+                        contractEndDateContainer.classList.add('hidden');
+                        const input = contractEndDateContainer.querySelector('input[name="contract_end_date"]');
+                        if (input) input.removeAttribute('required');
+                    }
+                });
+                employmentTypeSelect.dispatchEvent(new Event('change'));
+            }
+        }
+
+        // Employee Management Functions
+        function toggleStatus(employeeId, currentStatus) {
+            const message = currentStatus === 'active' 
+                ? `Are you sure you want to deactivate employee ${employeeId}?`
+                : `Are you sure you want to activate employee ${employeeId}?`;
+            
+            document.getElementById('statusConfirmMessage').textContent = message;
+            document.getElementById('confirmStatusAction').dataset.employeeId = employeeId;
+            openModal('statusConfirmModal');
+        }
+
+        function confirmStatusAction() {
+            const employeeId = document.getElementById('confirmStatusAction').dataset.employeeId;
+            const url = '{{ route("employees.toggle.status", ["employeeId" => ":employeeId"]) }}'.replace(':employeeId', employeeId);
+            
+            fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                closeModal('statusConfirmModal');
+                if (data.success) {
+                    showSuccessModal(data.message || 'Status updated successfully');
+                    filterTable();
+                } else {
+                    showErrorModal(data.message || 'Failed to update status');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                closeModal('statusConfirmModal');
+                showErrorModal('Failed to update status');
+            });
+        }
+
+        function viewEmployeeDetails(employeeId) {
+            const url = '{{ route("employees.show", ["employeeId" => ":employeeId"]) }}'.replace(':employeeId', employeeId) + '?mode=view';
+            
+            fetch(url, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('viewEmployeeContent').innerHTML = html;
+                openModal('viewEmployeeModal');
+            })
+            .catch(error => {
+                showErrorModal('Failed to load employee details.');
+                console.error('Error:', error);
+            });
+        }
+
+        function editEmployee(employeeId) {
+            const url = '{{ route("employees.show", ["employeeId" => ":employeeId"]) }}'.replace(':employeeId', employeeId) + '?mode=edit';
+            
+            fetch(url, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('editEmployeeContent').innerHTML = html;
+                const form = document.getElementById('editEmployeeForm');
+                if (form) handleEmploymentTypeChange(form);
+                openModal('editEmployeeModal');
+            })
+            .catch(error => {
+                showErrorModal('Failed to load employee details.');
+                console.error('Error:', error);
+            });
+        }
+
+        // Notification Functions
+        function showSuccessModal(message) {
+            showNotification(message, 'success');
+        }
+
+        function showErrorModal(message) {
+            showNotification(message, 'error');
+        }
+
+        function showNotification(message, type) {
+            const icon = type === 'success' ? 'fa-check-circle text-green-500' : 'fa-times-circle text-red-500';
+            const bgColor = type === 'success' ? 'bg-green-50' : 'bg-red-50';
+            const borderColor = type === 'success' ? 'border-green-400' : 'border-red-400';
+            const textColor = type === 'success' ? 'text-green-700' : 'text-red-700';
+
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 ${bgColor} border-l-4 ${borderColor} ${textColor} p-4 rounded-lg shadow-lg z-50 max-w-sm transform translate-x-full transition-transform duration-300`;
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${icon} text-xl mr-3"></i>
+                    <span class="font-medium">${message}</span>
+                </div>
+            `;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 10);
+
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const allTab = document.getElementById('allEmployeesTab');
+            const addTab = document.getElementById('addEmployeeTab');
+            if (allTab) allTab.addEventListener('click', switchToAllTab);
+            if (addTab) addTab.addEventListener('click', switchToAddTab);
+
+            const searchInput = document.getElementById('searchEmployee');
+            const departmentFilter = document.getElementById('departmentFilter');
+            const statusFilter = document.getElementById('statusFilter');
+
+            if (searchInput) searchInput.addEventListener('input', debouncedFilter);
+            if (departmentFilter) departmentFilter.addEventListener('change', filterTable);
+            if (statusFilter) statusFilter.addEventListener('change', filterTable);
+
+            const addForm = document.getElementById('addEmployeeForm');
+            if (addForm) handleEmploymentTypeChange(addForm);
+
+            const confirmButton = document.getElementById('confirmStatusAction');
+            if (confirmButton) confirmButton.addEventListener('click', confirmStatusAction);
+
+            // Initialize drag and drop
+            initializeDragAndDrop();
+
+            if (addForm) {
+                addForm.addEventListener('submit', function(e) {
+                    const requiredFields = addForm.querySelectorAll('[required]');
+                    let isValid = true;
+                    requiredFields.forEach(field => {
+                        if (!field.value.trim()) {
+                            isValid = false;
+                            field.classList.add('border-red-500');
+                        } else {
+                            field.classList.remove('border-red-500');
                         }
                     });
-                    document.getElementById('editEmployeeForm').action = `/dashboard/employee/${id}`;
-                    openModal('editEmployeeModal');
-                })
-                .catch(error => {
-                    console.error('Error fetching employee:', error);
-                    alert('Failed to load employee data. Please try again.');
-                });
-        }
-
-        function openDeleteModal(id) {
-            currentDeleteId = id;
-            openModal('deleteEmployeeModal');
-        }
-
-        function deleteEmployee(id) {
-            fetch(`/dashboard/employee/${id}`, {
-                method: 'DELETE',
-                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error('Failed to delete employee');
-                    return res.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById(`employee-${id}`).remove();
-                        closeModal('deleteEmployeeModal');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error deleting employee:', error);
-                    alert('Failed to delete employee. Please try again.');
-                });
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // Tab navigation
-            document.getElementById('allEmployeesTab').addEventListener('click', () => toggleTab('allEmployeesTab'));
-            document.getElementById('addEmployeeTab').addEventListener('click', () => toggleTab('addEmployeeTab'));
-
-            // Form validation for Add Employee
-            document.getElementById('addEmployeeForm').addEventListener('submit', function(e) {
-                let valid = true;
-                const fields = [
-                    { id: 'name', errorId: 'nameError', message: 'Full Name is required' },
-                    { id: 'employee_id', errorId: 'employeeIdError', message: 'Employee ID is required' },
-                    { id: 'email', errorId: 'emailError', message: 'Valid email is required' },
-                    { id: 'department', errorId: 'departmentError', message: 'Department is required' },
-                    { id: 'position', errorId: 'positionError', message: 'Position is required' },
-                    { id: 'role', errorId: 'roleError', message: 'Role is required' },
-                    { id: 'base_salary', errorId: 'baseSalaryError', message: 'Base Salary is required' },
-                    { id: 'employment_type', errorId: 'employmentTypeError', message: 'Employment Type is required' },
-                    { id: 'hire_date', errorId: 'hireDateError', message: 'Hire Date is required' }
-                ];
-
-                fields.forEach(field => {
-                    const input = document.getElementById(field.id);
-                    const error = document.getElementById(field.errorId);
-                    if (!input.value.trim()) {
-                        error.classList.remove('hidden');
-                        valid = false;
-                    } else {
-                        error.classList.add('hidden');
-                    }
-                });
-
-                const email = document.getElementById('email');
-                const emailError = document.getElementById('emailError');
-                if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-                    emailError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    emailError.classList.add('hidden');
-                }
-
-                const dob = document.getElementById('dob');
-                const dobError = document.getElementById('dobError');
-                if (dob.value && !/^\d{4}-\d{2}-\d{2}$/.test(dob.value)) {
-                    dobError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    dobError.classList.add('hidden');
-                }
-
-                const contractEndDate = document.getElementById('contract_end_date');
-                const contractEndDateError = document.getElementById('contractEndDateError');
-                if (contractEndDate.value && !/^\d{4}-\d{2}-\d{2}$/.test(contractEndDate.value)) {
-                    contractEndDateError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    contractEndDateError.classList.add('hidden');
-                }
-
-                if (!valid) {
-                    e.preventDefault();
-                }
-            });
-
-            // Form validation for Edit Employee
-            document.getElementById('editEmployeeForm').addEventListener('submit', function(e) {
-                let valid = true;
-                const fields = [
-                    { id: 'edit_name', errorId: 'editNameError', message: 'Full Name is required' },
-                    { id: 'edit_employee_id', errorId: 'editEmployeeIdError', message: 'Employee ID is required' },
-                    { id: 'edit_email', errorId: 'editEmailError', message: 'Valid email is required' },
-                    { id: 'edit_department', errorId: 'editDepartmentError', message: 'Department is required' },
-                    { id: 'edit_position', errorId: 'editPositionError', message: 'Position is required' },
-                    { id: 'edit_role', errorId: 'editRoleError', message: 'Role is required' },
-                    { id: 'edit_base_salary', errorId: 'editBaseSalaryError', message: 'Base Salary is required' },
-                    { id: 'edit_employment_type', errorId: 'editEmploymentTypeError', message: 'Employment Type is required' },
-                    { id: 'edit_hire_date', errorId: 'editHireDateError', message: 'Hire Date is required' },
-                    { id: 'edit_status', errorId: 'editStatusError', message: 'Status is required' }
-                ];
-
-                fields.forEach(field => {
-                    const input = document.getElementById(field.id);
-                    const error = document.getElementById(field.errorId);
-                    if (!input.value.trim()) {
-                        error.classList.remove('hidden');
-                        valid = false;
-                    } else {
-                        error.classList.add('hidden');
-                    }
-                });
-
-                const email = document.getElementById('edit_email');
-                const emailError = document.getElementById('editEmailError');
-                if (email.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-                    emailError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    emailError.classList.add('hidden');
-                }
-
-                const dob = document.getElementById('edit_dob');
-                const dobError = document.getElementById('editDobError');
-                if (dob.value && !/^\d{4}-\d{2}-\d{2}$/.test(dob.value)) {
-                    dobError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    dobError.classList.add('hidden');
-                }
-
-                const contractEndDate = document.getElementById('edit_contract_end_date');
-                const contractEndDateError = document.getElementById('editContractEndDateError');
-                if (contractEndDate.value && !/^\d{4}-\d{2}-\d{2}$/.test(contractEndDate.value)) {
-                    contractEndDateError.classList.remove('hidden');
-                    valid = false;
-                } else {
-                    contractEndDateError.classList.add('hidden');
-                }
-
-                if (!valid) {
-                    e.preventDefault();
-                }
-            });
-
-            // Delete button
-            const confirmDeleteButton = document.getElementById('confirmDeleteButton');
-            if (confirmDeleteButton) {
-                confirmDeleteButton.addEventListener('click', function() {
-                    if (currentDeleteId) {
-                        deleteEmployee(currentDeleteId);
+                    if (!isValid) {
+                        e.preventDefault();
+                        showErrorModal('Please fill in all required fields');
                     }
                 });
             }
 
-            // Search functionality
-            const searchInput = document.getElementById('searchEmployee');
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    const searchValue = this.value.toLowerCase();
-                    const rows = document.querySelectorAll('.employee-row');
-                    rows.forEach(row => {
-                        const name = row.dataset.name || '';
-                        const id = row.dataset.id || '';
-                        const matches = name.includes(searchValue) || id.includes(searchValue);
-                        row.style.display = matches ? '' : 'none';
-                    });
-                });
-            }
+            const urlParams = new URLSearchParams(window.location.search);
+            const activeTab = urlParams.get('tab') || 'all';
+            if (activeTab === 'add') switchToAddTab();
 
-            // Make date inputs readonly but allow picker
-            ['hire_date', 'edit_hire_date', 'dob', 'edit_dob', 'contract_end_date', 'edit_contract_end_date'].forEach(id => {
-                const input = document.getElementById(id);
-                if (input) {
-                    input.setAttribute('readonly', 'readonly');
-                    input.style.cursor = 'pointer';
-                    input.addEventListener('focus', function() {
-                        this.removeAttribute('readonly');
-                    });
-                    input.addEventListener('blur', function() {
-                        this.setAttribute('readonly', 'readonly');
-                    });
-                    input.addEventListener('click', function() {
-                        this.showPicker();
-                    });
+            attachPaginationListeners();
+
+            document.addEventListener('click', function(e) {
+                if (e.target.classList.contains('fixed') && e.target.id.includes('Modal')) {
+                    closeModal(e.target.id);
+                }
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    const openModals = document.querySelectorAll('.fixed:not(.hidden)');
+                    openModals.forEach(modal => closeModal(modal.id));
                 }
             });
         });

@@ -1,0 +1,48 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+class CreateEmployeesTable extends Migration
+{
+    public function up()
+    {
+        Schema::create('employees', function (Blueprint $table) {
+            $table->id();
+            $table->string('employee_id')->unique();
+            $table->string('name');
+            $table->string('email')->unique()->nullable();
+            $table->string('password')->nullable();
+            $table->string('remember_token', 100)->nullable();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('department');
+            $table->string('role');
+            $table->string('position');
+            $table->decimal('base_salary', 15, 2);
+            $table->decimal('allowances', 15, 2)->nullable();
+            $table->decimal('deductions', 15, 2)->default(0.00);
+            $table->string('status')->default('Active');
+            $table->string('gender')->nullable();
+            $table->date('dob')->nullable();
+            $table->string('nationality')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('address')->nullable();
+            $table->date('hire_date');
+            $table->date('contract_end_date')->nullable();
+            $table->string('bank_name')->nullable()->comment('Name of the bank from banks table');
+            $table->string('account_number')->nullable();
+            $table->string('employment_type')->default('Full-Time');
+            $table->string('nssf_number')->nullable();
+            $table->string('nhif_number')->nullable();
+            $table->string('tin_number')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
+        });
+    }
+
+    public function down()
+    {
+        Schema::dropIfExists('employees');
+    }
+}

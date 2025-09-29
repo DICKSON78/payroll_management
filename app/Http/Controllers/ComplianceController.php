@@ -48,6 +48,9 @@ class ComplianceController extends Controller
     {
         $user = Auth::user();
         if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+            }
             abort(403, 'Unauthorized action.');
         }
 
@@ -70,21 +73,35 @@ class ComplianceController extends Controller
         ]);
 
         if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => implode(', ', $validator->errors()->all())], 422);
+            }
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        ComplianceTask::create([
-            'task_id' => 'CMP-' . strtoupper(uniqid()),
-            'type' => $request->type,
-            'employee_id' => $request->employee_id ?: null,
-            'due_date' => $request->due_date,
-            'amount' => $request->amount ?: null,
-            'details' => $request->details,
-            'status' => 'Pending',
-            'created_by' => $user->id,
-        ]);
+        try {
+            ComplianceTask::create([
+                'task_id' => 'CMP-' . strtoupper(uniqid()),
+                'type' => $request->type,
+                'employee_id' => $request->employee_id ?: null,
+                'due_date' => $request->due_date,
+                'amount' => $request->amount ?: null,
+                'details' => $request->details,
+                'status' => 'Pending',
+                'created_by' => $user->id,
+            ]);
 
-        return redirect()->route('compliance.index')->with('success', 'Compliance task created successfully.');
+            if ($request->ajax()) {
+                return response()->json(['success' => true, 'message' => 'Compliance task created successfully.']);
+            }
+            return redirect()->route('compliance.index')->with('success', 'Compliance task created successfully.');
+        } catch (\Exception $e) {
+            \Log::error('Compliance task creation failed: ' . $e->getMessage());
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Failed to create compliance task: ' . $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Failed to create compliance task: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -123,6 +140,9 @@ class ComplianceController extends Controller
     {
         $user = Auth::user();
         if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+            }
             abort(403, 'Unauthorized action.');
         }
 
@@ -145,21 +165,35 @@ class ComplianceController extends Controller
         ]);
 
         if ($validator->fails()) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => implode(', ', $validator->errors()->all())], 422);
+            }
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $task = ComplianceTask::findOrFail($id);
-        $task->update([
-            'type' => $request->type,
-            'employee_id' => $request->employee_id ?: null,
-            'due_date' => $request->due_date,
-            'amount' => $request->amount ?: null,
-            'details' => $request->details,
-            'status' => 'Pending',
-            'updated_by' => $user->id,
-        ]);
+        try {
+            $task = ComplianceTask::findOrFail($id);
+            $task->update([
+                'type' => $request->type,
+                'employee_id' => $request->employee_id ?: null,
+                'due_date' => $request->due_date,
+                'amount' => $request->amount ?: null,
+                'details' => $request->details,
+                'status' => 'Pending',
+                'updated_by' => $user->id,
+            ]);
 
-        return redirect()->route('compliance.index')->with('success', 'Compliance task updated successfully.');
+            if ($request->ajax()) {
+                return response()->json(['success' => true, 'message' => 'Compliance task updated successfully.']);
+            }
+            return redirect()->route('compliance.index')->with('success', 'Compliance task updated successfully.');
+        } catch (\Exception $e) {
+            \Log::error('Compliance task update failed: ' . $e->getMessage());
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Failed to update compliance task: ' . $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Failed to update compliance task: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -171,15 +205,29 @@ class ComplianceController extends Controller
         $task = ComplianceTask::findOrFail($id);
 
         if (strtolower($user->role) === 'employee' && ($task->employee_id != ($user->employee->id ?? 0))) {
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized action.'], 403);
+            }
             abort(403, 'Unauthorized action.');
         }
 
-        $task->update([
-            'status' => 'Submitted',
-            'submitted_by' => $user->id,
-            'submitted_at' => now(),
-        ]);
+        try {
+            $task->update([
+                'status' => 'Submitted',
+                'submitted_by' => $user->id,
+                'submitted_at' => now(),
+            ]);
 
-        return redirect()->route('compliance.index')->with('success', 'Compliance task submitted successfully.');
+            if ($request->ajax()) {
+                return response()->json(['success' => true, 'message' => 'Compliance task submitted successfully.']);
+            }
+            return redirect()->route('compliance.index')->with('success', 'Compliance task submitted successfully.');
+        } catch (\Exception $e) {
+            \Log::error('Compliance task submission failed: ' . $e->getMessage());
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Failed to submit compliance task: ' . $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Failed to submit compliance task: ' . $e->getMessage());
+        }
     }
 }
