@@ -36,16 +36,16 @@
             <i class="fas fa-users text-green-500 mr-2"></i> Employee List
             <span class="ml-2 text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{{ $employees->total() }} employees</span>
         </h3>
-        
+
         <div class="flex items-center space-x-3">
             <!-- Bulk Import Button -->
-            <button onclick="openModal('bulkImportModal')" 
+            <button onclick="openModal('bulkImportModal')"
                     class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all duration-200 flex items-center">
                 <i class="fas fa-upload mr-2"></i> Bulk Import
             </button>
-            
+
             <!-- Export Button -->
-            <button onclick="exportEmployees()" 
+            <button onclick="exportEmployees()"
                     class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center">
                 <i class="fas fa-download mr-2"></i> Export
             </button>
@@ -283,12 +283,12 @@
                         <h4 class="text-lg font-medium text-gray-700 border-b pb-2">Salary Information</h4>
                         <div>
                             <label class="block text-gray-600 text-sm font-medium mb-2">Base Salary (TZS) *</label>
-                            <input type="number" name="base_salary" step="0.01" min="0" required 
+                            <input type="number" name="base_salary" step="0.01" min="0" required
                                 class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200">
                         </div>
                         <div>
                             <label class="block text-gray-600 text-sm font-medium mb-2">Allowances</label>
-                            <select name="allowances[]" multiple 
+                            <select name="allowances[]" multiple
                                     class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm">
                                 @foreach($allowances as $allowance)
                                     <option value="{{ $allowance->id }}">
@@ -302,7 +302,7 @@
                             <div class="flex items-start">
                                 <i class="fas fa-info-circle text-blue-500 mt-1 mr-2"></i>
                                 <div class="text-sm text-blue-700">
-                                    <strong>Note:</strong> Selected allowances will be automatically added to the employee's total salary. 
+                                    <strong>Note:</strong> Selected allowances will be automatically added to the employee's total salary.
                                     If no allowances are selected, the base salary will be used as the total salary.
                                 </div>
                             </div>
@@ -419,7 +419,7 @@
                                     <p class="text-purple-600 text-sm">Get the pre-formatted Excel template</p>
                                 </div>
                             </div>
-                            <a href="{{ route('employees.download-template') }}" 
+                            <a href="{{ route('employees.download-template') }}"
                                class="w-full bg-white border border-purple-300 text-purple-700 rounded-lg py-3 px-4 hover:bg-purple-50 transition-all duration-200 flex items-center justify-center space-x-2 font-medium">
                                 <i class="fas fa-download"></i>
                                 <span>Download Excel Template</span>
@@ -450,7 +450,7 @@
                     <div class="space-y-6">
                         <form id="bulkImportForm" action="{{ route('employees.bulk-import') }}" method="POST" enctype="multipart/form-data">
                             @csrf
-                            
+
                             <!-- Drag & Drop Area -->
                             <div id="dropZone" class="border-3 border-dashed border-green-300 rounded-2xl p-8 text-center transition-all duration-300 bg-green-50 hover:bg-green-100 hover:border-green-400 cursor-pointer">
                                 <div class="flex flex-col items-center justify-center space-y-4">
@@ -462,7 +462,7 @@
                                         <p class="text-gray-500">or <span class="text-green-600 font-medium">click to browse</span></p>
                                     </div>
                                     <input type="file" id="fileInput" name="file" accept=".xlsx,.xls,.csv" class="hidden" required>
-                                    <button type="button" onclick="document.getElementById('fileInput').click()" 
+                                    <button type="button" onclick="document.getElementById('fileInput').click()"
                                             class="px-6 py-3 text-sm font-medium text-green-600 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-all duration-200 shadow-sm">
                                         Choose File from Computer
                                     </button>
@@ -481,7 +481,7 @@
                                             <p id="fileSize" class="text-sm text-gray-500"></p>
                                         </div>
                                     </div>
-                                    <button type="button" onclick="removeFile()" 
+                                    <button type="button" onclick="removeFile()"
                                             class="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-all duration-200">
                                         <i class="fas fa-times text-lg"></i>
                                     </button>
@@ -493,7 +493,7 @@
                             </div>
 
                             <!-- Import Button -->
-                            <button type="submit" id="importButton" 
+                            <button type="submit" id="importButton"
                                     class="w-full hidden bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl py-4 px-6 font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
                                 <div class="flex items-center justify-center space-x-3">
                                     <i class="fas fa-rocket text-lg"></i>
@@ -695,7 +695,7 @@
                 ];
                 const validExtensions = ['.xlsx', '.xls', '.csv'];
                 const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                
+
                 return validTypes.includes(file.type) || validExtensions.includes(fileExtension);
             }
 
@@ -721,7 +721,7 @@
             const fileInfo = document.getElementById('fileInfo');
             const dropZone = document.getElementById('dropZone');
             const importButton = document.getElementById('importButton');
-            
+
             fileInput.value = '';
             fileInfo.classList.add('hidden');
             dropZone.classList.remove('hidden');
@@ -795,12 +795,12 @@
             const currentSort = document.querySelector('[data-sort-column="' + column + '"]')?.dataset.sortColumn || 'name';
             const currentDirection = document.querySelector('[data-sort-column="' + column + '"]')?.dataset.sortDirection || 'asc';
             const newDirection = (currentSort === column && currentDirection === 'asc') ? 'desc' : 'asc';
-            
+
             document.querySelectorAll('[data-sort-column]').forEach(th => {
                 th.dataset.sortDirection = 'asc';
             });
             document.querySelector('[data-sort-column="' + column + '"]').dataset.sortDirection = newDirection;
-            
+
             filterTable();
         }
 
@@ -856,7 +856,7 @@
         function handleEmploymentTypeChange(form) {
             const employmentTypeSelect = form.querySelector('select[name="employment_type"]');
             const contractEndDateContainer = form.querySelector('#contractEndDateContainer');
-            
+
             if (employmentTypeSelect && contractEndDateContainer) {
                 employmentTypeSelect.addEventListener('change', function() {
                     if (this.value === 'contract') {
@@ -875,10 +875,10 @@
 
         // Employee Management Functions
         function toggleStatus(employeeId, currentStatus) {
-            const message = currentStatus === 'active' 
+            const message = currentStatus === 'active'
                 ? `Are you sure you want to deactivate employee ${employeeId}?`
                 : `Are you sure you want to activate employee ${employeeId}?`;
-            
+
             document.getElementById('statusConfirmMessage').textContent = message;
             document.getElementById('confirmStatusAction').dataset.employeeId = employeeId;
             openModal('statusConfirmModal');
@@ -887,7 +887,7 @@
         function confirmStatusAction() {
             const employeeId = document.getElementById('confirmStatusAction').dataset.employeeId;
             const url = '{{ route("employees.toggle.status", ["employeeId" => ":employeeId"]) }}'.replace(':employeeId', employeeId);
-            
+
             fetch(url, {
                 method: 'PUT',
                 headers: {
@@ -915,7 +915,7 @@
 
         function viewEmployeeDetails(employeeId) {
             const url = '{{ route("employees.show", ["employeeId" => ":employeeId"]) }}'.replace(':employeeId', employeeId) + '?mode=view';
-            
+
             fetch(url, {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
@@ -934,7 +934,7 @@
 
         function editEmployee(employeeId) {
             const url = '{{ route("employees.show", ["employeeId" => ":employeeId"]) }}'.replace(':employeeId', employeeId) + '?mode=edit';
-            
+
             fetch(url, {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
@@ -1026,13 +1026,13 @@
                         showErrorModal('Please select a file to import.');
                         return;
                     }
-                    
+
                     // Show loading state
                     const submitBtn = bulkImportForm.querySelector('button[type="submit"]');
                     const originalText = submitBtn.innerHTML;
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Importing...';
                     submitBtn.disabled = true;
-                    
+
                     // Form will submit normally
                 });
             }
@@ -1092,9 +1092,9 @@
                         option.style.display = text.includes(searchTerm) ? '' : 'none';
                     });
                 });
-                
+
                 select.parentNode.insertBefore(searchInput, select);
-                
+
                 // Style the multiple select
                 select.style.minHeight = '120px';
             });

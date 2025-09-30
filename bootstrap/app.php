@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\PreventBrowserHistory; // <--- Hii ni mpya!
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -13,7 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Global middleware
         $middleware->web(append: [
-            \App\Http\Middleware\CheckSessionTimeout::class, // Add session timeout to web group
+            \App\Http\Middleware\CheckSessionTimeout::class,
+            PreventBrowserHistory::class, // <--- ONGEZA HII HAPA!
         ]);
 
         // Hapa tunasajili 'aliases' za middleware kwa ajili ya matumizi rahisi kwenye faili za 'routes'.

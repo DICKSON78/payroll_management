@@ -24,7 +24,7 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request)
+     public function login(Request $request)
     {
         // Validate credentials
         $credentials = $request->validate([
@@ -69,9 +69,12 @@ class LoginController extends Controller
             Session::put('last_activity', time());
 
             // Redirect based on role
+            // ** MAREKEBISHO YAMEFANYIKA HAPA **
             if ($user->isAdmin() || $user->isHR()) {
+                // Admin na HR wanaanza kwenye Dashboard (dashboard.index)
                 return redirect()->intended(route('dashboard'));
             } elseif ($user->isEmployee()) {
+                // Employee anaanza kwenye Portal Attendance
                 return redirect()->intended(route('portal.attendance'));
             }
 
@@ -85,9 +88,8 @@ class LoginController extends Controller
         ])->onlyInput('email');
     }
 
-    public function logout(Request $request)
+   public function logout(Request $request)
     {
-        // Log user activity before logout
         if (Auth::check()) {
             $user = Auth::user();
             $user->updateLastLogout();
@@ -97,8 +99,10 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        // Redirect bila headers za kuzuia cache - Middleware sasa inalinda routes zote
         return redirect()->route('login')->with('status', 'You have been logged out successfully.');
     }
+
 
     /**
      * Show forgot password form

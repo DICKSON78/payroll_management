@@ -53,14 +53,19 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::middleware(['role:admin,hr'])->prefix('dashboard')->group(function () {
         // Employee Routes
-        Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
-        Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
-        Route::get('/employees/{employeeId}', [EmployeeController::class, 'show'])->name('employees.show');
-        Route::put('/employees/{employeeId}/update', [EmployeeController::class, 'update'])->name('employees.update');
-        Route::put('/employees/{employeeId}/toggle-status', [EmployeeController::class, 'toggleStatus'])->name('employees.toggle.status');
+        // 1. Employee Routes: STATIK zenye maneno maalum (Lazima ziwe juu)
         Route::post('/employees/bulk-import', [EmployeeController::class, 'bulkImport'])->name('employees.bulk-import');
         Route::get('/employees/export', [EmployeeController::class, 'export'])->name('employees.export');
         Route::get('/employees/download-template', [EmployeeController::class, 'downloadTemplate'])->name('employees.download-template');
+        
+        // 2. Route za msingi
+        Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+        Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
+        
+        // 3. Route za DINAMIKI zenye parameter ya {employeeId} (Lazima ziwe chini)
+        Route::get('/employees/{employeeId}', [EmployeeController::class, 'show'])->name('employees.show');
+        Route::put('/employees/{employeeId}/update', [EmployeeController::class, 'update'])->name('employees.update');
+        Route::put('/employees/{employeeId}/toggle-status', [EmployeeController::class, 'toggleStatus'])->name('employees.toggle.status');
 
         // Payroll Routes
         Route::get('/payroll', [PayrollController::class, 'index'])->name('payroll');

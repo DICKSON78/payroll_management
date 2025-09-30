@@ -1181,477 +1181,209 @@
     </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Month/year picker configuration for filtering
-        const monthFilterConfig = {
-            altInput: true,
-            altFormat: 'F Y',
-            dateFormat: 'Y-m',
-            maxDate: 'today',
-            plugins: [
-                new monthSelectPlugin({
-                    shorthand: false,
-                    dateFormat: 'Y-m',
-                    altFormat: 'F Y'
-                })
-            ]
-        };
+    // Tab Management & Search
+document.addEventListener('DOMContentLoaded', function() {
+    
+    const tabs = {
+        payroll: { tab: document.getElementById('payrollTab'), container: document.getElementById('payrollContainer') },
+        transactions: { tab: document.getElementById('transactionsTab'), container: document.getElementById('transactionsContainer') },
+        alerts: { tab: document.getElementById('alertsTab'), container: document.getElementById('alertsContainer') }
+    };
+    
+    // Initialize tabs from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeTab = urlParams.get('tab') || 'payroll';
+    switchTab(activeTab);
 
-        // Initialize month filter
-        const monthFilter = flatpickr('#monthFilter', monthFilterConfig);
-        
-        // Event listener for month filter
-        if (monthFilter) {
-            monthFilter.config.onChange.push(function(selectedDates, dateStr, instance) {
-                filterByMonth(dateStr);
+    // Tab click events
+    Object.keys(tabs).forEach(tabKey => {
+        tabs[tabKey].tab.addEventListener('click', () => switchTab(tabKey));
+    });
+
+    // Search functionality
+    const searchElements = [
+        { inputId: 'searchPayroll', tableId: 'payrollTable' },
+        { inputId: 'searchTransaction', tableId: 'transactionTable' },
+        { inputId: 'searchAlerts', tableId: 'alertTable' }
+    ];
+
+    searchElements.forEach(item => {
+        const input = document.getElementById(item.inputId);
+        if (input) {
+            input.addEventListener('input', function() {
+                filterTable(item.tableId, this.value.toLowerCase());
             });
         }
+    });
 
-        // Function to filter tables by month
-        function filterByMonth(month) {
-            const payrollRows = document.querySelectorAll('#payrollTable .payroll-row');
-            const transactionRows = document.querySelectorAll('#transactionTable .transaction-row');
-            const alertRows = document.querySelectorAll('#alertTable .alert-row');
+    // Initialize all date pickers
+    initializeDatePickers();
 
-            let payrollCount = 0;
-            let transactionCount = 0;
-            let alertCount = 0;
+    // Initialize month filter calendar
+    initializeMonthFilter();
+});
 
-            // Filter payroll rows
-            payrollRows.forEach(row => {
-                const rowPeriod = row.dataset.period;
-                if (!month || rowPeriod === month) {
-                    row.style.display = '';
-                    payrollCount++;
-                } else {
-                    row.style.display = 'none';
+// Tab switch
+function switchTab(tabName) {
+    document.querySelectorAll('[id$="Container"]').forEach(c => c.classList.add('hidden'));
+    document.querySelectorAll('[role="tab"]').forEach(t => {
+        t.classList.remove('text-white', 'bg-green-600');
+        t.classList.add('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
+        t.setAttribute('aria-selected', 'false');
+    });
+
+    const activeContainer = document.getElementById(tabName + 'Container');
+    const activeTab = document.getElementById(tabName + 'Tab');
+    if (activeContainer && activeTab) {
+        activeContainer.classList.remove('hidden');
+        activeTab.classList.remove('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
+        activeTab.classList.add('text-white', 'bg-green-600');
+        activeTab.setAttribute('aria-selected', 'true');
+    }
+
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabName);
+    window.history.replaceState({}, '', url);
+}
+
+// Table filter
+function filterTable(tableId, searchTerm) {
+    const rows = document.querySelectorAll(`#${tableId} tr`);
+    let visibleCount = 0;
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            row.style.display = '';
+            visibleCount++;
+        } else row.style.display = 'none';
+    });
+
+    const countElement = document.getElementById(tableId.replace('Table', 'Count'));
+    if (countElement) countElement.textContent = visibleCount;
+}
+
+// Modals
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Month Filter (Basic flatpickr)
+function initializeMonthFilter() {
+    const monthFilter = document.getElementById('monthFilter');
+    if (!monthFilter) return;
+
+    let calendar = null;
+    let selectedDate = null;
+
+    monthFilter.addEventListener('focus', function() {
+        if (calendar) return;
+
+        calendar = flatpickr(monthFilter, {
+            mode: "single",
+            dateFormat: "Y-m-d",
+            defaultDate: selectedDate,
+            static: true,
+            position: "auto",
+            animate: true,
+            onReady: function(selectedDates, dateStr, instance) {
+                instance.calendarContainer.style.zIndex = 50;
+            },
+            onChange: function(selectedDates) {
+                if (selectedDates.length > 0) {
+                    selectedDate = selectedDates[0];
+                    filterByMonth(selectedDate);
                 }
-            });
-
-            // Filter transaction rows
-            transactionRows.forEach(row => {
-                const rowPeriod = row.dataset.period;
-                if (!month || rowPeriod === month) {
-                    row.style.display = '';
-                    transactionCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            // Filter alert rows
-            alertRows.forEach(row => {
-                const rowPeriod = row.dataset.period;
-                if (!month || rowPeriod === month) {
-                    row.style.display = '';
-                    alertCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            // Update counts
-            document.getElementById('payrollCount').textContent = payrollCount;
-            document.getElementById('transactionCount').textContent = transactionCount;
-            document.getElementById('alertCount').textContent = alertCount;
-        }
-
-        // Clear month filter
-        window.clearMonthFilter = function() {
-            if (monthFilter) {
-                monthFilter.clear();
-                filterByMonth('');
-            }
-        };
-
-        // Modal Management
-        window.openModal = function(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.classList.remove('hidden');
-                setTimeout(() => {
-                    modal.querySelector('.modal-content').classList.remove('scale-95');
-                    modal.querySelector('.modal-content').classList.add('scale-100');
-                }, 10);
-            }
-        };
-
-        window.closeModal = function(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.querySelector('.modal-content').classList.remove('scale-100');
-                modal.querySelector('.modal-content').classList.add('scale-95');
-                setTimeout(() => {
-                    modal.classList.add('hidden');
-                }, 300);
-            }
-        };
-
-        // Close modals when clicking outside
-        document.querySelectorAll('.fixed.inset-0').forEach(modal => {
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    closeModal(modal.id);
-                }
-            });
-        });
-
-        // Employee Selection Logic for Run Payroll
-        const employeeSelection = document.getElementById('employee_selection');
-        const employeeIdDiv = document.getElementById('employee_id');
-        if (employeeSelection && employeeIdDiv) {
-            employeeSelection.addEventListener('change', function() {
-                employeeIdDiv.classList.toggle('hidden', this.value !== 'single');
-            });
-        }
-
-        // Employee Selection Logic for Retroactive Pay
-        const retroEmployeeSelection = document.getElementById('retro_employee_selection');
-        const retroEmployeeIdsDiv = document.getElementById('retro_employee_ids');
-        if (retroEmployeeSelection && retroEmployeeIdsDiv) {
-            retroEmployeeSelection.addEventListener('change', function() {
-                retroEmployeeIdsDiv.classList.toggle('hidden', this.value !== 'single');
-            });
-        }
-
-        // Form Submission with AJAX
-        function submitForm(formId, spinnerId, successMessage, errorMessage) {
-            const form = document.getElementById(formId);
-            const spinner = document.getElementById(spinnerId);
-            if (form && spinner) {
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    spinner.classList.remove('hidden');
-                    const formData = new FormData(form);
-                    fetch(form.action, {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                            'Accept': 'application/json'
-                        }
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        spinner.classList.add('hidden');
-                        if (data.success) {
-                            showSuccessModal(successMessage);
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
-                        } else {
-                            showErrorModal(data.message || errorMessage);
-                        }
-                    })
-                    .catch(error => {
-                        spinner.classList.add('hidden');
-                        showErrorModal(errorMessage);
-                        console.error('Error:', error);
-                    });
+            },
+            onOpen: function(selectedDates, dateStr, instance) {
+                document.addEventListener('click', function closeCalendar(e) {
+                    if (!instance.calendarContainer.contains(e.target) && e.target !== monthFilter) {
+                        instance.close();
+                        document.removeEventListener('click', closeCalendar);
+                    }
                 });
             }
-        }
-
-        // Success Modal
-        function showSuccessModal(message) {
-            const modal = document.createElement('div');
-            modal.className = 'success-modal';
-            modal.innerHTML = `
-                <div class="flex flex-col items-center">
-                    <i class="fas fa-check-circle tick-icon"></i>
-                    <p class="text-lg font-semibold">${message}</p>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            setTimeout(() => {
-                modal.remove();
-            }, 2000);
-        }
-
-        // Error Modal
-        function showErrorModal(message) {
-            const modal = document.createElement('div');
-            modal.className = 'error-modal';
-            modal.innerHTML = `
-                <div class="flex flex-col items-center">
-                    <i class="fas fa-times-circle cross-icon"></i>
-                    <p class="text-lg font-semibold">${message}</p>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            setTimeout(() => {
-                modal.remove();
-            }, 2000);
-        }
-
-        // Form Submissions
-        submitForm('runPayrollForm', 'runPayrollSpinner', 'Payroll processed successfully!', 'Failed to process payroll.');
-        submitForm('retroactivePayForm', 'retroactivePaySpinner', 'Retroactive pay processed successfully!', 'Failed to process retroactive pay.');
-
-        // Revert Payroll Form Logic
-// Revert All Form Logic
-const revertAllForm = document.getElementById('revertAllForm');
-if (revertAllForm) {
-    revertAllForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const checkboxes = document.querySelectorAll('input[name="revert_types[]"]:checked');
-        if (checkboxes.length === 0) {
-            showErrorModal('Please select at least one data type to revert.');
-            return;
-        }
-        
-        const selectedTypes = Array.from(checkboxes).map(cb => cb.value);
-        const period = document.getElementById('revert_period_all').value;
-        const employeeId = document.getElementById('revert_employee_all').value;
-        
-        let confirmMessage = 'Are you sure you want to revert the following data?\n\n';
-        selectedTypes.forEach(type => {
-            confirmMessage += `• ${type.charAt(0).toUpperCase() + type.slice(1)}\n`;
         });
-        
-        if (period) {
-            confirmMessage += `\nPeriod: ${period}`;
-        }
-        if (employeeId) {
-            const employeeSelect = document.getElementById('revert_employee_all');
-            const employeeName = employeeSelect.options[employeeSelect.selectedIndex].text;
-            confirmMessage += `\nEmployee: ${employeeName}`;
-        }
-        
-        confirmMessage += '\n\nThis action cannot be undone!';
-        
-        if (!confirm(confirmMessage)) {
-            return;
-        }
-        
-        const spinner = document.getElementById('revertAllSpinner');
-        spinner.classList.remove('hidden');
-        
-        const formData = new FormData(this);
-        
-        fetch(this.action, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                'Accept': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            spinner.classList.add('hidden');
-            if (data.success) {
-                showSuccessModal(data.message);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-            } else {
-                showErrorModal(data.message || 'Failed to revert data.');
-            }
-        })
-        .catch(error => {
-            spinner.classList.add('hidden');
-            showErrorModal('Failed to revert data.');
-            console.error('Error:', error);
-        });
+
+        calendar.open();
+    });
+
+    monthFilter.addEventListener('click', function() {
+        if (calendar) calendar.open();
     });
 }
-        // Tab Navigation
-        const tabs = {
-            'payrollTab': 'payrollContainer',
-            'transactionsTab': 'transactionsContainer',
-            'alertsTab': 'alertsContainer'
-        };
 
-        Object.keys(tabs).forEach(tabId => {
-            const tab = document.getElementById(tabId);
-            if (tab) {
-                tab.addEventListener('click', function() {
-                    Object.keys(tabs).forEach(id => {
-                        const t = document.getElementById(id);
-                        const container = document.getElementById(tabs[id]);
-                        if (t && container) {
-                            if (id === tabId) {
-                                t.classList.remove('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
-                                t.classList.add('text-white', 'bg-green-600');
-                                container.classList.remove('hidden');
-                                t.setAttribute('aria-selected', 'true');
-                            } else {
-                                t.classList.remove('text-white', 'bg-green-600');
-                                t.classList.add('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
-                                container.classList.add('hidden');
-                                t.setAttribute('aria-selected', 'false');
-                            }
-                        }
-                    });
+// Filter by selected month
+function filterByMonth(date) {
+    const selectedMonth = date.getMonth() + 1;
+    const selectedYear = date.getFullYear();
+    const monthYear = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
 
-                    const url = new URL(window.location);
-                    url.searchParams.set('tab', tabId.replace('Tab', ''));
-                    history.pushState(null, '', url);
-                });
-            }
+    ['payroll-row', 'transaction-row', 'alert-row'].forEach(cls => {
+        let visible = 0;
+        document.querySelectorAll(`.${cls}`).forEach(row => {
+            const rowPeriod = row.getAttribute('data-period');
+            if (rowPeriod === monthYear) {
+                row.style.display = '';
+                visible++;
+            } else row.style.display = 'none';
         });
+        const countEl = document.getElementById(cls.replace('-row','Count'));
+        if (countEl) countEl.textContent = visible;
+    });
+}
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const activeTab = urlParams.get('tab') || 'payroll';
-        const tabToActivate = `${activeTab}Tab`;
-        if (tabs[tabToActivate]) {
-            document.getElementById(tabToActivate).click();
-        }
+// Clear month filter
+function clearMonthFilter() {
+    const monthFilter = document.getElementById('monthFilter');
+    if (monthFilter) monthFilter.value = '';
 
-        // Search Functionality
-        function setupSearch(inputId, tableId, searchFields) {
-            const input = document.getElementById(inputId);
-            const table = document.getElementById(tableId);
-            if (input && table) {
-                input.addEventListener('input', function() {
-                    const searchTerm = this.value.toLowerCase();
-                    const rows = table.querySelectorAll('tr');
-                    rows.forEach(row => {
-                        const rowData = searchFields.map(field => row.dataset[field] || '').join(' ').toLowerCase();
-                        row.style.display = rowData.includes(searchTerm) ? '' : 'none';
-                    });
-                });
-            }
-        }
+    const allRows = document.querySelectorAll('.payroll-row, .transaction-row, .alert-row');
+    allRows.forEach(row => row.style.display = '');
 
-        setupSearch('searchPayroll', 'payrollTable', ['id', 'period']);
-        setupSearch('searchTransaction', 'transactionTable', ['id', 'employee']);
-        setupSearch('searchAlerts', 'alertTable', ['id', 'employee']);
+    ['payroll', 'transaction', 'alert'].forEach(id => {
+        const countEl = document.getElementById(id + 'Count');
+        if (countEl) countEl.textContent = document.querySelectorAll(`.${id}-row`).length;
+    });
+}
 
-        // View Payroll Details
-        window.viewPayrollDetails = function(payrollId) {
-            fetch(`{{ route('payroll.show', ['id' => ':id']) }}`.replace(':id', encodeURIComponent(payrollId)), {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('payrollDetailsId').textContent = data.payroll.payroll_id || 'N/A';
-                    document.getElementById('payrollDetailsEmployee').textContent = data.payroll.employee_name || 'N/A';
-                    document.getElementById('payrollDetailsPeriod').textContent = data.payroll.period || 'N/A';
-                    document.getElementById('payrollDetailsBaseSalary').textContent = `TZS ${Number(data.payroll.base_salary || 0).toLocaleString()}`;
-                    document.getElementById('payrollDetailsAllowances').textContent = `TZS ${Number(data.payroll.allowances || 0).toLocaleString()}`;
-                    document.getElementById('payrollDetailsDeductions').textContent = `TZS ${Number(data.payroll.deductions || 0).toLocaleString()}`;
-                    document.getElementById('payrollDetailsNetSalary').textContent = `TZS ${Number(data.payroll.net_salary || 0).toLocaleString()}`;
-                    document.getElementById('payrollDetailsStatus').textContent = data.payroll.status || 'N/A';
-                    document.getElementById('payrollDetailsPaymentMethod').textContent = data.payroll.payment_method || 'N/A';
-                    openModal('payrollDetailsModal');
-                } else {
-                    showErrorModal(data.message || 'Failed to load payroll details.');
-                }
-            })
-            .catch(error => {
-                showErrorModal('Failed to load payroll details.');
-                console.error('Error:', error);
-            });
-        };
-
-        // Revert Payroll Button Handler
-        window.revertPayroll = function(payrollId) {
-            const payrollIdSelect = document.getElementById('payroll_id');
-            const revertPeriodSelect = document.getElementById('revert_period');
-            
-            if (payrollIdSelect) {
-                payrollIdSelect.value = payrollId;
-                revertPeriodSelect.value = '';
-                openModal('revertPayrollModal');
-            }
-        };
-
-        // View Transaction Details
-        window.viewTransactionDetails = function(transactionId) {
-            fetch(`{{ route('transaction.show', ['id' => ':id']) }}`.replace(':id', encodeURIComponent(transactionId)), {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('transactionDetailsId').textContent = data.transaction.transaction_id || 'N/A';
-                    document.getElementById('transactionDetailsEmployee').textContent = data.transaction.employee_name || 'N/A';
-                    document.getElementById('transactionDetailsAmount').textContent = `TZS ${Number(data.transaction.amount || 0).toLocaleString()}`;
-                    document.getElementById('transactionDetailsDate').textContent = data.transaction.transaction_date ? new Date(data.transaction.transaction_date).toLocaleDateString() : 'N/A';
-                    document.getElementById('transactionDetailsType').textContent = data.transaction.type || 'N/A';
-                    document.getElementById('transactionDetailsStatus').textContent = data.transaction.status || 'N/A';
-                    document.getElementById('transactionDetailsPaymentMethod').textContent = data.transaction.payment_method || 'N/A';
-                    document.getElementById('transactionDetailsDescription').textContent = data.transaction.description || 'N/A';
-                    openModal('transactionDetailsModal');
-                } else {
-                    showErrorModal(data.message || 'Failed to load transaction details.');
-                }
-            })
-            .catch(error => {
-                showErrorModal('Failed to load transaction details.');
-                console.error('Error:', error);
-            });
-        };
-
-        // View Alert Details
-        window.viewAlertDetails = function(alertId) {
-            fetch(`{{ route('alert.show', ['id' => ':id']) }}`.replace(':id', encodeURIComponent(alertId)), {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                    'Accept': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('alertDetailsId').textContent = data.alert.alert_id || 'N/A';
-                    document.getElementById('alertDetailsEmployee').textContent = data.alert.employee_name || 'N/A';
-                    document.getElementById('alertDetailsType').textContent = data.alert.type || 'N/A';
-                    document.getElementById('alertDetailsMessage').textContent = data.alert.message || 'N/A';
-                    document.getElementById('alertDetailsStatus').textContent = data.alert.status || 'N/A';
-                    document.getElementById('markAlertRead').dataset.alertId = alertId;
-                    document.getElementById('markAlertRead').style.display = data.alert.status.toLowerCase() === 'unread' ? 'flex' : 'none';
-                    openModal('alertDetailsModal');
-                } else {
-                    showErrorModal(data.message || 'Failed to load alert details.');
-                }
-            })
-            .catch(error => {
-                showErrorModal('Failed to load alert details.');
-                console.error('Error:', error);
-            });
-        };
-
-        // Mark Alert as Read
-        const markAlertReadBtn = document.getElementById('markAlertRead');
-        if (markAlertReadBtn) {
-            markAlertReadBtn.addEventListener('click', function() {
-                const alertId = this.dataset.alertId;
-                fetch(`{{ route('alert.read', ['id' => ':id']) }}`.replace(':id', encodeURIComponent(alertId)), {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showSuccessModal('Alert marked as read.');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
-                    } else {
-                        showErrorModal(data.message || 'Failed to mark alert as read.');
-                    }
-                })
-                .catch(error => {
-                    showErrorModal('Failed to mark alert as read.');
-                    console.error('Error:', error);
-                });
+// Initialize basic date pickers for all inputs that need calendar
+function initializeDatePickers() {
+    const dateInputs = ['monthFilter', 'payroll_period', 'retro_period'];
+    dateInputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            flatpickr(el, {
+                dateFormat: "Y-m-d"
             });
         }
     });
-    
+}
+
+// Close modals when clicking outside
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('modal-overlay')) closeModal(event.target.id);
+});
+
+// Close modals with Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(modal => closeModal(modal.id));
+    }
+});
+
 </script>
 @endsection

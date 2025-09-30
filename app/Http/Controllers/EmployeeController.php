@@ -48,8 +48,8 @@ class EmployeeController extends Controller
         $search = $request->input('search', '');
         $department = $request->input('department', '');
         $status = $request->input('status', '');
-        $sort = $request->input('sort', 'created_at'); // Default sort by created_at
-        $direction = $request->input('direction', 'desc'); // Default descending
+        $sort = $request->input('sort', 'created_at');
+        $direction = $request->input('direction', 'desc');
 
         // Validate sort column
         $validSortColumns = ['name', 'position', 'department', 'base_salary', 'created_at', 'employee_id'];
@@ -81,7 +81,6 @@ class EmployeeController extends Controller
 
         $employees = $query->orderBy($sort, $direction)->paginate(15);
 
-        // Rest of your existing code remains the same...
         $totalEmployees = Employee::count();
         $activeEmployeeCount = Employee::where('status', 'active')->count();
         $employeeGrowth = $this->calculateGrowth(Employee::class, 'hire_date');
@@ -93,7 +92,7 @@ class EmployeeController extends Controller
         $allowances = Allowance::where('active', 1)->get();
         $roles = Role::all();
 
-        // AJAX response remains the same...
+        // AJAX response
         if ($request->ajax()) {
             return $this->getEmployeesTableHtml($employees, $request);
         }
@@ -126,9 +125,9 @@ class EmployeeController extends Controller
         try {
             // FIXED: Use correct field name for employee_id
             $employee = Employee::with(['departmentRel', 'allowances' => function($query) {
-                $query->where('active', 1); // Only load active allowances
+                $query->where('active', 1);
             }])
-                ->where('employee_id', $employeeId) // FIXED: Use direct comparison
+                ->where('employee_id', $employeeId)
                 ->first();
 
             if (!$employee) {
@@ -147,7 +146,6 @@ class EmployeeController extends Controller
             $mode = $request->query('mode', 'view');
 
             if ($mode === 'edit') {
-                // Inline edit form HTML
                 ob_start();
                 ?>
                 <form id="editEmployeeForm" action="<?php echo route('employees.update', $employee->employee_id); ?>" method="POST">
@@ -253,7 +251,6 @@ class EmployeeController extends Controller
                                         <label class="flex items-center">
                                             <input type="checkbox" name="allowances[]" value="<?php echo $allowance->id; ?>"
                                                 <?php
-                                                // Fix: Check if allowances is a collection and contains the allowance
                                                 if ($employee->allowances && is_object($employee->allowances) && method_exists($employee->allowances, 'contains')) {
                                                     echo $employee->allowances->contains($allowance->id) ? 'checked' : '';
                                                 }
@@ -296,17 +293,10 @@ class EmployeeController extends Controller
                             </div>
                         </div>
                     </div>
-                    <div class="mt-6 flex justify-end space-x-3">
-                        <button type="button" onclick="closeModal('editEmployeeModal')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
-                            <i class="fas fa-save mr-2"></i> Save Changes
-                        </button>
-                    </div>
                 </form>
                 <?php
                 return ob_get_clean();
             } else {
-                // Inline view HTML
                 ob_start();
                 ?>
                 <div>
@@ -336,7 +326,6 @@ class EmployeeController extends Controller
                         <div><strong>Base Salary:</strong> TZS <?php echo number_format($employee->base_salary, 0); ?></div>
                         <div><strong>Allowances:</strong>
                             <?php
-                            // Fix: Check if allowances is a collection and not empty
                             if ($employee->allowances && is_object($employee->allowances) && method_exists($employee->allowances, 'isEmpty') && !$employee->allowances->isEmpty()) {
                                 echo $employee->allowances->pluck('name')->implode(', ');
                             } else {
@@ -372,7 +361,6 @@ class EmployeeController extends Controller
      */
     public function update(Request $request, $employeeId)
     {
-        // FIXED: Use direct comparison for employee_id
         $employee = Employee::where('employee_id', $employeeId)->first();
 
         if (!$employee) {
@@ -420,7 +408,6 @@ class EmployeeController extends Controller
         try {
             DB::beginTransaction();
 
-            // Calculate total allowances
             $totalAllowances = $request->has('allowances') && is_array($request->allowances)
                 ? array_sum(Allowance::whereIn('id', $request->allowances)->pluck('amount')->toArray())
                 : 0.00;
@@ -479,7 +466,6 @@ class EmployeeController extends Controller
     public function toggleStatus(Request $request, $employeeId)
     {
         try {
-            // FIXED: Use direct comparison for employee_id
             $employee = Employee::where('employee_id', $employeeId)->first();
 
             if (!$employee) {
@@ -513,7 +499,7 @@ class EmployeeController extends Controller
     public function downloadTemplate()
     {
         try {
-            // Create new Spreadsheet
+            // Create new Spreadsheet - HAIHITAJI kuangalia employees!
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
 
@@ -638,9 +624,8 @@ class EmployeeController extends Controller
      */
     public function bulkImport(Request $request)
     {
-        // Validate file
         $validator = Validator::make($request->all(), [
-            'file' => 'required|mimes:xlsx,xls,csv|max:10240' // 10MB max
+            'file' => 'required|mimes:xlsx,xls,csv|max:10240'
         ]);
 
         if ($validator->fails()) {
@@ -650,12 +635,10 @@ class EmployeeController extends Controller
         }
 
         try {
-            // Check if Excel package is available
             if (!class_exists('Maatwebsite\Excel\Excel')) {
                 throw new Exception('Excel package not installed. Run: composer require maatwebsite/excel');
             }
 
-            // Import the file
             Excel::import(new EmployeesImport, $request->file('file'));
 
             return redirect()->route('employees.index')
@@ -685,93 +668,48 @@ class EmployeeController extends Controller
     public function export()
     {
         try {
-            // Check if there are employees to export
             $employeeCount = Employee::count();
 
             if ($employeeCount === 0) {
                 return redirect()->back()->with('error', 'No employees found to export.');
             }
 
-            // Use Laravel Excel package for export
-            if (class_exists('Maatwebsite\Excel\Excel')) {
-                return Excel::download(new EmployeesExport, 'employees_' . date('Ymd_His') . '.xlsx');
-            } else {
-                // Fallback manual export
-                return $this->manualExport();
-            }
-        } catch (Exception $e) {
-            Log::error('Export failed: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to export employees: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Manual export fallback
-     */
-    private function manualExport()
-    {
-        try {
             $employees = Employee::with(['departmentRel', 'allowances'])->get();
-
-            // Check if employees exist
-            if ($employees->isEmpty()) {
-                throw new Exception('No employees found to export.');
-            }
-
-            $spreadsheet = new Spreadsheet();
-            $sheet = $spreadsheet->getActiveSheet();
-
-            // Headers
-            $headers = [
-                'Employee ID', 'Name', 'Email', 'Phone', 'Department', 'Position',
-                'Employment Type', 'Hire Date', 'Base Salary', 'Status', 'Role'
-            ];
-            $sheet->fromArray([$headers], null, 'A1');
-
-            // Data
-            $data = [];
+            
+            $exportData = [];
             foreach ($employees as $employee) {
-                $data[] = [
+                $exportData[] = [
                     $employee->employee_id,
                     $employee->name,
                     $employee->email,
-                    $employee->phone,
-                    $employee->departmentRel->name ?? $employee->department,
-                    $employee->position,
-                    $employee->employment_type,
+                    $employee->phone ?? 'N/A',
+                    $employee->gender ?? 'N/A',
+                    $employee->dob ? $employee->dob->format('Y-m-d') : 'N/A',
+                    $employee->nationality ?? 'N/A',
+                    $employee->address ?? 'N/A',
+                    $employee->departmentRel->name ?? $employee->department ?? 'N/A',
+                    $employee->position ?? 'N/A',
+                    $employee->role ?? 'N/A',
+                    $employee->employment_type ?? 'N/A',
                     $employee->hire_date->format('Y-m-d'),
+                    $employee->contract_end_date ? $employee->contract_end_date->format('Y-m-d') : 'N/A',
                     $employee->base_salary,
+                    $employee->allowances ?? 0.00,
+                    $employee->bank_name ?? 'N/A',
+                    $employee->account_number ?? 'N/A',
+                    $employee->nssf_number ?? 'N/A',
+                    $employee->tin_number ?? 'N/A',
+                    $employee->nhif_number ?? 'N/A',
                     $employee->status,
-                    $employee->role
+                    $employee->created_at->format('Y-m-d H:i:s')
                 ];
             }
-            $sheet->fromArray($data, null, 'A2');
 
-            // Style headers
-            $headerStyle = [
-                'font' => ['bold' => true],
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'E8F5E8']
-                ]
-            ];
-            $sheet->getStyle('A1:K1')->applyFromArray($headerStyle);
-
-            // Auto-size columns
-            foreach (range('A', 'K') as $column) {
-                $sheet->getColumnDimension($column)->setAutoSize(true);
-            }
-
-            $writer = new Xlsx($spreadsheet);
-            $filename = 'employees_export_' . date('Ymd_His') . '.xlsx';
-
-            $tempFile = tempnam(sys_get_temp_dir(), $filename);
-            $writer->save($tempFile);
-
-            return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+            return Excel::download(new EmployeesExport($exportData), 'employees_' . date('Ymd_His') . '.xlsx');
 
         } catch (Exception $e) {
-            throw new Exception('Manual export failed: ' . $e->getMessage());
+            Log::error('Export failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to export employees: ' . $e->getMessage());
         }
     }
 
@@ -783,7 +721,6 @@ class EmployeeController extends Controller
         \Log::info('=== EMPLOYEE STORE START ===');
         \Log::info('Request Data:', $request->all());
 
-        // Validation
         $rules = [
             'name' => 'required',
             'email' => 'required|email|unique:employees,email',
@@ -811,23 +748,19 @@ class EmployeeController extends Controller
         try {
             DB::beginTransaction();
 
-            // Generate Employee ID
             $employeeId = $this->generateUniqueEmployeeId();
 
-            // Generate Password
             $nameParts = explode(' ', trim($request->name));
             $lastName = end($nameParts);
             $initialPassword = strtolower($lastName ?: 'employee123');
             $password = Hash::make($initialPassword);
 
-            // Calculate total allowances
             $totalAllowances = 0.00;
             if ($request->has('allowances') && is_array($request->allowances)) {
                 $allowanceIds = $request->allowances;
                 $totalAllowances = Allowance::whereIn('id', $allowanceIds)->sum('amount');
             }
 
-            // Create employee
             $employeeData = [
                 'employee_id' => $employeeId,
                 'name' => $request->name,
@@ -844,7 +777,6 @@ class EmployeeController extends Controller
                 'deductions' => 0.00,
             ];
 
-            // Add optional fields
             $optionalFields = ['phone', 'gender', 'dob', 'nationality', 'address', 'contract_end_date',
                               'bank_name', 'account_number', 'nssf_number', 'tin_number', 'nhif_number'];
 
@@ -858,7 +790,6 @@ class EmployeeController extends Controller
 
             $employee = Employee::create($employeeData);
 
-            // Sync allowances
             if ($request->has('allowances') && is_array($request->allowances)) {
                 $employee->allowances()->sync($request->allowances);
             }
@@ -890,10 +821,8 @@ class EmployeeController extends Controller
         $prefix = "EMP";
 
         do {
-            // Generate random combination of letters and numbers (8 characters)
             $randomPart = strtoupper(Str::random(8));
             $newId = $prefix . '-' . $randomPart;
-
         } while (Employee::where('employee_id', $newId)->exists());
 
         return $newId;
