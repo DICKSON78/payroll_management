@@ -45,6 +45,45 @@
         </div>
     @endif
 
+    <!-- Custom Confirmation Modal -->
+    <div id="customConfirmModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50" aria-hidden="true">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content" role="dialog" aria-labelledby="confirmModalTitle">
+            <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100 rounded-t-xl">
+                <div class="flex justify-between items-center">
+                    <h3 id="confirmModalTitle" class="text-xl font-semibold text-red-700 flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2"></i> Confirm Deletion
+                    </h3>
+                    <button type="button" onclick="closeConfirmModal()" class="text-gray-500 hover:text-gray-700 rounded-full p-2 hover:bg-gray-200 transition-all duration-200">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-red-100">
+                    <i class="fas fa-trash-alt text-red-600 text-xl"></i>
+                </div>
+                <p id="confirmMessage" class="text-gray-700 text-center mb-6 text-lg">
+                    Are you sure you want to delete <span id="selectedReportsCount" class="font-semibold text-red-600">0</span> selected report(s)?
+                </p>
+                <p class="text-gray-500 text-center mb-6 text-sm">
+                    This action cannot be undone and all selected reports will be permanently removed.
+                </p>
+                <div class="flex justify-center space-x-3">
+                    <button type="button" id="cancelDeleteBtn"
+                            class="text-gray-700 bg-gray-100 hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-6 py-2.5 transition-all duration-200 flex items-center shadow-sm hover:shadow-md">
+                        <i class="fas fa-times mr-2"></i> Cancel
+                    </button>
+                    <button type="button" id="confirmDeleteBtn"
+                            class="text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-6 py-2.5 transition-all duration-200 flex items-center shadow-sm hover:shadow-md">
+                        <i class="fas fa-trash-alt mr-2"></i> Delete Reports
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Tab Navigation -->
     <div class="mb-6">
         <div class="flex space-x-4 border-b border-gray-200" role="tablist">
@@ -68,7 +107,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m1.85-5.65a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
                 </div>
-                <input id="searchReport" type="text" placeholder="Search by report ID, employee, or type..." class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" aria-label="Search reports by ID, employee, or type">
+                <input id="searchReport" type="text" placeholder="Search by report ID, employee, or type..." class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-600 placeholder-gray-500" aria-label="Search reports by ID, employee, or type">
             </div>
 
             <!-- Quick Actions -->
@@ -76,11 +115,13 @@
                 <button onclick="refreshReports()" class="text-gray-600 hover:text-green-600 p-2 rounded-lg hover:bg-green-50 transition-all duration-200" title="Refresh Reports">
                     <i class="fas fa-sync-alt text-sm"></i>
                 </button>
-                @if($isAdminOrHR)
-                <button onclick="toggleTab('generateReportTab')" class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-3 py-2 text-center transition-all duration-200 inline-flex items-center shadow-sm hover:shadow-md">
-                    <i class="fas fa-plus mr-2"></i> New Report
+                
+                <!-- Delete Button - Imeongezwa hapa -->
+                <button onclick="openCustomConfirmModal()" id="deleteSelectedBtn" class="text-gray-600 hover:text-red-300 p-2 rounded-lg hover:bg-red-50 transition-all duration-200" title="Delete Selected Reports">
+                    <i class="fas fa-trash-alt text-sm"></i>
+                    <span id="deleteCountBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center hidden"></span>
                 </button>
-                @endif
+                
             </div>
         </div>
 
@@ -103,6 +144,11 @@
                 <table class="w-full">
                     <thead>
                         <tr class="bg-gradient-to-r from-green-50 to-green-100 text-gray-700 text-sm">
+                            @if($isAdminOrHR)
+                            <th class="py-3.5 px-4 text-center font-semibold w-12">
+                                <input type="checkbox" id="selectAll" class="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2">
+                            </th>
+                            @endif
                             <th class="py-3.5 px-6 text-left font-semibold">Report ID</th>
                             <th class="py-3.5 px-6 text-left font-semibold">Type</th>
                             <th class="py-3.5 px-6 text-left font-semibold">Period</th>
@@ -151,15 +197,22 @@
                                 ];
                                 $formatIcon = $formatIcons[strtolower($report->export_format)] ?? 'fas fa-file';
                             @endphp
-                            <tr id="report-{{ $report->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 report-row group" 
+                            <tr id="report-{{ $report->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 report-row group {{ $isAdminOrHR ? 'bulk-select-row' : '' }}" 
                                 data-report-id="{{ strtolower($report->report_id ?? '') }}" 
                                 data-employee="{{ strtolower($report->employee->name ?? 'all') }}" 
                                 data-type="{{ strtolower($report->type ?? '') }}"
-                                data-status="{{ strtolower($report->status ?? '') }}">
+                                data-status="{{ strtolower($report->status ?? '') }}"
+                                data-report-data='@json($report)'>
+                                @if($isAdminOrHR)
+                                <td class="py-4 px-4 text-center">
+                                    <input type="checkbox" name="report_ids[]" value="{{ $report->id }}" 
+                                           class="report-checkbox w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2">
+                                </td>
+                                @endif
                                 <td class="py-4 px-6">
                                     <div class="flex items-center space-x-2">
                                         <i class="fas fa-file text-green-400 text-sm"></i>
-                                        <span class="text-sm text-gray-900 font-mono font-medium">{{ $report->report_id ?? 'N/A' }}</span>
+                                        <span class="text-sm text-gray-600 font-mono font-medium">{{ $report->report_id ?? 'N/A' }}</span>
                                     </div>
                                 </td>
                                 <td class="py-4 px-6">
@@ -171,7 +224,7 @@
                                 <td class="py-4 px-6">
                                     <div class="flex items-center space-x-2">
                                         <i class="fas fa-calendar text-orange-500 text-sm"></i>
-                                        <span class="text-sm text-gray-900 font-medium">{{ $report->period ?? 'N/A' }}</span>
+                                        <span class="text-sm text-gray-600 font-medium">{{ $report->period ?? 'N/A' }}</span>
                                     </div>
                                 </td>
                                 <td class="py-4 px-6">
@@ -180,7 +233,7 @@
                                             <span class="font-medium text-white text-xs">{{ $report->employee ? substr($report->employee->name, 0, 1) : 'A' }}</span>
                                         </div>
                                         <div>
-                                            <div class="font-medium text-gray-900 text-sm">{{ $report->employee->name ?? 'All Employees' }}</div>
+                                            <div class="font-medium text-gray-600 text-sm">{{ $report->employee->name ?? 'All Employees' }}</div>
                                             <div class="text-xs text-gray-500">{{ $report->employee->employee_id ?? 'N/A' }}</div>
                                         </div>
                                     </div>
@@ -223,15 +276,6 @@
                                                     Download {{ strtoupper($report->export_format) }}
                                                 </span>
                                             </a>
-                                            <button onclick="previewReport({{ $report->id }})" 
-                                                    class="text-blue-600 hover:text-blue-800 p-2 rounded-lg hover:bg-blue-50 transition-all duration-200 group relative"
-                                                    title="Preview Report"
-                                                    aria-label="Preview {{ $report->type }} report">
-                                                <i class="fas fa-eye text-sm"></i>
-                                                <span class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                                                    Quick Preview
-                                                </span>
-                                            </button>
                                         @else
                                             <span class="text-gray-400 p-2 cursor-not-allowed group relative" 
                                                   title="Download Unavailable" 
@@ -241,18 +285,6 @@
                                                     {{ $report->status === 'completed' ? 'File Not Found' : ucfirst($report->status) }}
                                                 </span>
                                             </span>
-                                        @endif
-                                        
-                                        @if($isAdminOrHR)
-                                        <button onclick="openDeleteModal({{ $report->id }}, '{{ $report->report_id }}')" 
-                                                class="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 transition-all duration-200 group relative" 
-                                                title="Delete Report" 
-                                                aria-label="Delete {{ $report->type }} report">
-                                            <i class="fas fa-trash-alt text-sm"></i>
-                                            <span class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                                                Delete Report
-                                            </span>
-                                        </button>
                                         @endif
                                     </div>
                                 </td>
@@ -268,7 +300,7 @@
                     <div class="mx-auto w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center shadow-sm">
                         <i class="fas fa-file-alt text-green-400 text-3xl"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-gray-900 mb-2">No reports generated yet</h3>
+                    <h3 class="text-xl font-semibold text-gray-600 mb-2">No reports generated yet</h3>
                     <p class="text-gray-500 mb-8 max-w-md mx-auto">Start by generating your first payroll or compliance report to see it listed here.</p>
                     <button class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-6 py-3 text-center transition-all duration-200 inline-flex items-center shadow-sm hover:shadow-md transform hover:-translate-y-0.5" 
                             onclick="toggleTab('generateReportTab')">
@@ -370,17 +402,17 @@
                             <i class="fas fa-chart-bar text-green-500 mr-2 text-sm"></i>Report Type
                         </label>
                         <select name="report_type" id="report_type" required 
-                                class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-900 shadow-sm">
+                                class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-600 shadow-sm">
                             <option value="">Select a report type</option>
-                            <option value="payslip">📄 Payslip</option>
+                            <option value="payslip"> Payslip</option>
                             @if($isAdminOrHR)
-                            <option value="payroll_summary">💰 Payroll Summary</option>
-                            <option value="tax_report">🧾 Tax Report</option>
-                            <option value="nssf_report">🏦 NSSF Report</option>
-                            <option value="nhif_report">🏥 NHIF Report</option>
-                            <option value="wcf_report">🛡️ WCF Report</option>
-                            <option value="sdl_report">🎯 SDL Report</option>
-                            <option value="year_end_summary">📊 Year-End Summary</option>
+                            <option value="payroll_summary"> Payroll Summary</option>
+                            <option value="tax_report"> Tax Report</option>
+                            <option value="nssf_report"> NSSF Report</option>
+                            <option value="nhif_report"> NHIF Report</option>
+                            <option value="wcf_report"> WCF Report</option>
+                            <option value="sdl_report"> SDL Report</option>
+                            <option value="year_end_summary"> Year-End Summary</option>
                             @endif
                         </select>
                         <span class="text-red-500 text-xs mt-1 hidden" id="reportTypeError">
@@ -393,12 +425,12 @@
                         @enderror
                     </div>
                     
-                    <div>
+                    <div class="w-full">
                         <label for="report_period" class="block text-gray-700 text-sm font-semibold mb-2 flex items-center">
                             <i class="fas fa-calendar text-green-500 mr-2 text-sm"></i>Report Period
                         </label>
                         <input type="text" name="report_period" id="report_period" required 
-                               class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-900 shadow-sm" 
+                               class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-600 shadow-sm" 
                                placeholder="Select period">
                         <span class="text-red-500 text-xs mt-1 hidden" id="reportPeriodError">
                             <i class="fas fa-exclamation-circle mr-1"></i>Report Period is required
@@ -418,8 +450,8 @@
                             <i class="fas fa-user text-green-500 mr-2 text-sm"></i>Specific Employee (Optional)
                         </label>
                         <select name="employee_id" id="employee_id" 
-                                class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-900 shadow-sm">
-                            <option value="">👥 All Employees</option>
+                                class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-600 shadow-sm">
+                            <option value=""> All Employees</option>
                             @foreach($employees ?? [] as $employee)
                                 <option value="{{ $employee->employee_id }}">{{ $employee->name }} ({{ $employee->employee_id }})</option>
                             @endforeach
@@ -436,10 +468,10 @@
                             <i class="fas fa-download text-green-500 mr-2 text-sm"></i>Export Format
                         </label>
                         <select name="export_format" id="export_format" required 
-                                class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-900 shadow-sm">
-                            <option value="pdf">📊 PDF Document</option>
-                            <option value="excel">💾 Excel Spreadsheet</option>
-                            <option value="csv">📝 CSV File</option>
+                                class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-3 px-4 leading-6 transition-all duration-200 text-gray-600 shadow-sm">
+                            <option value="pdf"> PDF Document</option>
+                            <option value="excel"> Excel Spreadsheet</option>
+                            <option value="csv"> CSV File</option>
                         </select>
                         <span class="text-red-500 text-xs mt-1 hidden" id="exportFormatError">
                             <i class="fas fa-exclamation-circle mr-1"></i>Export Format is required
@@ -473,75 +505,6 @@
                     </div>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Delete Report Modal -->
-    @if($isAdminOrHR)
-    <div id="deleteReportModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50" aria-hidden="true">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content" role="dialog" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalDesc">
-            <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100 rounded-t-xl">
-                <div class="flex justify-between items-center">
-                    <h3 id="deleteModalTitle" class="text-xl font-semibold text-red-700 flex items-center">
-                        <i class="fas fa-exclamation-triangle mr-2"></i> Delete Report
-                    </h3>
-                    <button type="button" onclick="closeModal('deleteReportModal')" class="text-gray-500 hover:text-gray-700 rounded-full p-2 hover:bg-gray-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-red-300" aria-label="Close delete modal">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="p-6">
-                <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-red-100">
-                    <i class="fas fa-trash-alt text-red-600 text-xl"></i>
-                </div>
-                <p id="deleteModalDesc" class="text-gray-700 text-center mb-4">
-                    Are you sure you want to delete report <span id="deleteReportId" class="font-semibold text-red-600"></span>? 
-                    <br>This action is permanent and cannot be undone.
-                </p>
-                <div class="flex justify-center space-x-3">
-                    <button type="button" 
-                            class="text-gray-700 bg-gray-100 hover:bg-gray-200 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-6 py-2.5 transition-all duration-200 flex items-center shadow-sm"
-                            onclick="closeModal('deleteReportModal')" 
-                            aria-label="Cancel deletion">
-                        <i class="fas fa-times mr-2"></i> Cancel
-                    </button>
-                    <form id="deleteReportForm" method="POST" action="" class="inline">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" 
-                                class="text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-6 py-2.5 transition-all duration-200 flex items-center shadow-sm hover:shadow-md">
-                            <i class="fas fa-trash-alt mr-2"></i> Delete Report
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
-
-    <!-- Preview Modal -->
-    <div id="previewModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50" aria-hidden="true">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl transform transition-all duration-300 scale-95 modal-content" role="dialog" aria-labelledby="previewModalTitle">
-            <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-xl">
-                <div class="flex justify-between items-center">
-                    <h3 id="previewModalTitle" class="text-xl font-semibold text-blue-700 flex items-center">
-                        <i class="fas fa-eye mr-2"></i> Report Preview
-                    </h3>
-                    <button type="button" onclick="closeModal('previewModal')" class="text-gray-500 hover:text-gray-700 rounded-full p-2 hover:bg-gray-200 transition-all duration-200">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="p-6 max-h-96 overflow-y-auto">
-                <div id="previewContent" class="text-center text-gray-500">
-                    <i class="fas fa-spinner fa-spin text-2xl mb-4 text-blue-500"></i>
-                    <p>Loading preview...</p>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -689,37 +652,160 @@
             });
         }
 
-        // Delete modal
-        window.openDeleteModal = function(id, reportId) {
-            document.getElementById('deleteReportForm').action = `/dashboard/reports/${id}`;
-            document.getElementById('deleteReportId').textContent = reportId || 'Unknown';
-            openModal('deleteReportModal');
+        // Bulk selection functionality
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const reportCheckboxes = document.querySelectorAll('.report-checkbox');
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+        const deleteCountBadge = document.getElementById('deleteCountBadge');
+
+        // Select All functionality
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                reportCheckboxes.forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                });
+                updateBulkActions();
+            });
+        }
+
+        // Individual checkbox functionality
+        reportCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateBulkActions);
+        });
+
+        // Update bulk actions
+        function updateBulkActions() {
+            const selectedCount = document.querySelectorAll('.report-checkbox:checked').length;
+            
+            if (selectedCount > 0) {
+                deleteSelectedBtn.classList.remove('hidden');
+                deleteCountBadge.textContent = selectedCount;
+                deleteCountBadge.classList.remove('hidden');
+                
+                // Update select all checkbox state
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = selectedCount === reportCheckboxes.length;
+                    selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < reportCheckboxes.length;
+                }
+
+                // Add green background to selected rows
+                reportCheckboxes.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    if (checkbox.checked) {
+                        row.classList.add('bg-green-50', 'selected-row');
+                    } else {
+                        row.classList.remove('bg-green-50', 'selected-row');
+                    }
+                });
+            } else {
+                deleteSelectedBtn.classList.add('hidden');
+                deleteCountBadge.classList.add('hidden');
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = false;
+                    selectAllCheckbox.indeterminate = false;
+                }
+
+                // Remove green background from all rows
+                reportCheckboxes.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    row.classList.remove('bg-green-50', 'selected-row');
+                });
+            }
+        }
+
+        // Custom confirmation modal functions
+        window.openCustomConfirmModal = function() {
+            const selectedCount = document.querySelectorAll('.report-checkbox:checked').length;
+            
+            if (selectedCount === 0) {
+                showNotification('Please select at least one report to delete.', 'warning');
+                return;
+            }
+
+            document.getElementById('selectedReportsCount').textContent = selectedCount;
+            openConfirmModal();
         };
 
-        // Preview report function
-        window.previewReport = function(id) {
-            const previewContent = document.getElementById('previewContent');
-            previewContent.innerHTML = `
-                <div class="text-center py-8">
-                    <i class="fas fa-spinner fa-spin text-2xl mb-4 text-blue-500"></i>
-                    <p class="text-gray-600">Loading report preview...</p>
-                </div>
-            `;
+        function openConfirmModal() {
+            const modal = document.getElementById('customConfirmModal');
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
             
-            openModal('previewModal');
-            
-            // Simulate API call - in real implementation, you'd fetch from server
             setTimeout(() => {
-                previewContent.innerHTML = `
-                    <div class="text-center py-8">
-                        <i class="fas fa-file-pdf text-4xl text-red-500 mb-4"></i>
-                        <h4 class="font-semibold text-gray-700 mb-2">Report Preview</h4>
-                        <p class="text-gray-600 text-sm mb-4">This is a preview of the generated report.</p>
-                        <p class="text-gray-500 text-xs">For full details, please download the complete report file.</p>
-                    </div>
-                `;
-            }, 1500);
-        };
+                const modalContent = modal.querySelector('.modal-content');
+                if (modalContent) {
+                    modalContent.classList.remove('scale-95', 'opacity-0');
+                    modalContent.classList.add('scale-100', 'opacity-100');
+                }
+            }, 10);
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('customConfirmModal');
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.classList.remove('scale-100', 'opacity-100');
+                modalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.setAttribute('aria-hidden', 'true');
+                    document.body.style.overflow = 'auto';
+                }, 300);
+            }
+        }
+
+        // Handle confirm delete
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+            const selectedCheckboxes = document.querySelectorAll('.report-checkbox:checked');
+            const selectedIds = Array.from(selectedCheckboxes).map(cb => cb.value);
+            
+            // Create form and submit
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route('reports.bulk-delete') }}';
+            
+            const csrfToken = document.createElement('input');
+            csrfToken.type = 'hidden';
+            csrfToken.name = '_token';
+            csrfToken.value = '{{ csrf_token() }}';
+            form.appendChild(csrfToken);
+            
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'DELETE';
+            form.appendChild(methodInput);
+            
+            const idsInput = document.createElement('input');
+            idsInput.type = 'hidden';
+            idsInput.name = 'report_ids';
+            idsInput.value = selectedIds.join(',');
+            form.appendChild(idsInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+            
+            closeConfirmModal();
+        });
+
+        // Handle cancel delete
+        document.getElementById('cancelDeleteBtn').addEventListener('click', closeConfirmModal);
+
+        // Close modal on background click
+        document.getElementById('customConfirmModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmModal();
+            }
+        });
+
+        // Keyboard navigation for modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeConfirmModal();
+            }
+        });
 
         // Refresh reports function
         window.refreshReports = function() {
@@ -730,6 +816,28 @@
                 window.location.reload();
             }, 1000);
         };
+
+        // Show notification
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 transform transition-all duration-300 ${
+                type === 'info' ? 'bg-blue-500 text-white' :
+                type === 'success' ? 'bg-green-500 text-white' :
+                type === 'warning' ? 'bg-yellow-500 text-white' :
+                'bg-red-500 text-white'
+            }`;
+            notification.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-${type === 'info' ? 'info-circle' : type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : 'exclamation-circle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+        }
 
         function toggleTab(tabId) {
             const tabs = ['allReportsTab', 'generateReportTab'];
@@ -771,46 +879,6 @@
             }
         }
 
-        function openModal(id) {
-            const modal = document.getElementById(id);
-            if (modal) {
-                modal.classList.remove('hidden');
-                modal.setAttribute('aria-hidden', 'false');
-                document.body.style.overflow = 'hidden';
-                setTimeout(() => {
-                    const modalContent = modal.querySelector('.modal-content');
-                    if (modalContent) {
-                        modalContent.classList.remove('scale-95', 'opacity-0');
-                        modalContent.classList.add('scale-100', 'opacity-100');
-                    }
-                }, 10);
-            }
-        }
-
-        function closeModal(id) {
-            const modal = document.getElementById(id);
-            if (modal) {
-                const modalContent = modal.querySelector('.modal-content');
-                if (modalContent) {
-                    modalContent.classList.remove('scale-100', 'opacity-100');
-                    modalContent.classList.add('scale-95', 'opacity-0');
-                    setTimeout(() => {
-                        modal.classList.add('hidden');
-                        modal.setAttribute('aria-hidden', 'true');
-                        document.body.style.overflow = 'auto';
-                    }, 300);
-                }
-            }
-        }
-
-        // Keyboard navigation for modals
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeModal('deleteReportModal');
-                closeModal('previewModal');
-            }
-        });
-
         // Add CSS for shake animation
         const style = document.createElement('style');
         style.textContent = `
@@ -821,6 +889,19 @@
             }
             .animate-shake {
                 animation: shake 0.5s ease-in-out;
+            }
+            
+            .selected-row {
+                background-color: #f0f9f0 !important;
+                border-left: 4px solid #10b981;
+            }
+            
+            .selected-row:hover {
+                background-color: #e6f7e6 !important;
+            }
+            
+            #deleteSelectedBtn {
+                position: relative;
             }
         `;
         document.head.appendChild(style);
@@ -840,5 +921,11 @@
     }
     .flatpickr-day.today {
         border-color: #10b981 !important;
+    }
+
+    /* Ensure all form inputs have same width */
+    #generateReportForm select,
+    #generateReportForm input {
+        width: 100%;
     }
 </style>

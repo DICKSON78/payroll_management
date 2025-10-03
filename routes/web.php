@@ -95,6 +95,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/generate', [ReportController::class, 'generate'])->name('reports.generate');
             Route::get('/{id}/download', [ReportController::class, 'download'])->name('reports.download');
             Route::delete('/{id}', [ReportController::class, 'destroy'])->name('reports.destroy');
+            Route::delete('/reports/bulk-delete', [ReportController::class, 'bulkDelete'])->name('reports.bulk-delete');
         });
 
         // Compliance Management Routes

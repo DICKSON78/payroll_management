@@ -910,7 +910,7 @@ class ReportController extends Controller
     /**
      * Get Payroll Summary Data
      */
-    private function getPayrollSummaryData($period)
+ private function getPayrollSummaryData($period)
     {
         $payrollData = DB::table('payrolls')
             ->join('employees', 'payrolls.employee_id', '=', 'employees.employee_id')
@@ -926,6 +926,10 @@ class ReportController extends Controller
             )
             ->get();
 
+        // Get unique employee count - FIXED: Use DISTINCT employee count
+        $uniqueEmployeeIds = $payrollData->pluck('employee_id')->unique();
+        $actualEmployeeCount = $uniqueEmployeeIds->count();
+
         $employeeData = [];
         $totals = [
             'total_basic_salary' => 0,
@@ -938,7 +942,8 @@ class ReportController extends Controller
             'total_tuico' => 0,
             'total_madeni_nafsia' => 0,
             'total_take_home' => 0,
-            'employee_count' => $payrollData->count()
+            'employee_count' => $actualEmployeeCount, // Use actual count, not payroll records count
+            'payroll_records_count' => $payrollData->count() // Add this for reference
         ];
 
         foreach ($payrollData as $index => $payroll) {
@@ -988,6 +993,61 @@ class ReportController extends Controller
             'totals' => $totals
         ];
     }
+
+     /**
+     * Bulk Delete Reports
+     */
+    public function bulkDelete(Request $request)
+    {
+        $user = Auth::user();
+
+        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'report_ids' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->route('reports')
+                ->with('error', 'Invalid report selection.');
+        }
+
+        $reportIds = explode(',', $request->report_ids);
+        $deletedCount = 0;
+
+        foreach ($reportIds as $reportId) {
+            $report = Report::find($reportId);
+            
+            if ($report) {
+                // Delete associated files
+                $baseFilename = "{$report->report_id}_{$report->type}_{$report->period}";
+                $extensions = ['pdf', 'xlsx', 'csv'];
+
+                foreach ($extensions as $ext) {
+                    $filePath = self::REPORTS_PATH . '/' . $baseFilename . '.' . $ext;
+                    if (Storage::disk(self::STORAGE_DISK)->exists($filePath)) {
+                        Storage::disk(self::STORAGE_DISK)->delete($filePath);
+                    }
+                }
+
+                $report->delete();
+                $deletedCount++;
+            }
+        }
+
+        if ($deletedCount > 0) {
+            $message = $deletedCount === 1 
+                ? '1 report deleted successfully!'
+                : "{$deletedCount} reports deleted successfully!";
+                
+            return redirect()->route('reports')->with('success', $message);
+        }
+
+        return redirect()->route('reports')->with('error', 'No reports were deleted.');
+    }
+
 
     /**
      * Get Tax Report Data
