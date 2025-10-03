@@ -2,38 +2,70 @@
 
 namespace App\Exports;
 
-use App\Models\Employee;
-use App\Models\Payslip;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithTitle;
 
-class PayrollSummaryExport implements FromCollection, WithHeadings
+class PayrollSummaryExport implements FromCollection, WithHeadings, WithTitle
 {
-    protected $report;
+    protected $reportData;
 
-    public function __construct($report)
+    public function __construct($reportData)
     {
-        $this->report = $report;
+        $this->reportData = $reportData;
     }
 
     public function collection()
     {
-        $query = Payslip::where('period', $this->report->period);
-        if ($this->report->employee_id) {
-            $query->where('employee_id', $this->report->employee_id);
-        }
-        return $query->get()->map(function ($payslip) {
-            return [
-                'Employee' => $payslip->employee->name ?? 'N/A',
-                'Period' => $payslip->period,
-                'Gross Salary' => $payslip->gross_salary,
-                'Net Salary' => $payslip->net_salary,
+        $data = collect();
+        
+        // Add headers
+        $headers = [
+            'NA.', 'JINA LA MFANYAKAZI', 'CHEO', 'BASIC SALARY AS PER CONTRACT', 
+            'ALLOWANCE', 'GROSS SALARY', 'MWANZO WA KUAJIRIWA', 'MWISHO WA MKATABA',
+            '', 'BASIC/SALARY', 'NSSF', 'PAYEE', 'BIMA', 'BODI MIKOPO', 'TUICO', 
+            'MADENI NAFSIA', 'TAKE HOME', 'AKAUNTI'
+        ];
+        $data->push($headers);
+        
+        // Add employee data
+        $employeeNumber = 1;
+        foreach ($this->reportData['employees'] as $employee) {
+            $grossSalary = ($employee['basic_salary'] ?? 0) + ($employee['allowance'] ?? 0);
+            
+            $row = [
+                $employeeNumber++,
+                $employee['name'] ?? '',
+                $employee['position'] ?? '',
+                $employee['basic_salary'] ?? 0,
+                $employee['allowance'] ?? 0,
+                $grossSalary,
+                $employee['start_date'] ?? '',
+                $employee['end_date'] ?? '',
+                '', // Empty column
+                $employee['basic_salary_actual'] ?? $employee['basic_salary'] ?? 0,
+                $employee['nssf'] ?? 0,
+                $employee['payee'] ?? 0,
+                $employee['insurance'] ?? 0,
+                $employee['loan_board'] ?? 0,
+                $employee['tuico'] ?? 0,
+                $employee['personal_debts'] ?? 0,
+                $employee['take_home'] ?? 0,
+                $employee['account_number'] ?? ''
             ];
-        });
+            $data->push($row);
+        }
+        
+        return $data;
     }
 
     public function headings(): array
     {
-        return ['Employee', 'Period', 'Gross Salary', 'Net Salary'];
+        return [];
+    }
+
+    public function title(): string
+    {
+        return $this->reportData['sheet_name'] ?? 'Sheet3';
     }
 }

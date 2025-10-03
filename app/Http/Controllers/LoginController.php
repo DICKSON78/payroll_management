@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Routing\Controller;
 use App\Models\Employee;
 use Carbon\Carbon;
@@ -24,7 +25,7 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-     public function login(Request $request)
+    public function login(Request $request)
     {
         // Validate credentials
         $credentials = $request->validate([
@@ -69,12 +70,9 @@ class LoginController extends Controller
             Session::put('last_activity', time());
 
             // Redirect based on role
-            // ** MAREKEBISHO YAMEFANYIKA HAPA **
             if ($user->isAdmin() || $user->isHR()) {
-                // Admin na HR wanaanza kwenye Dashboard (dashboard.index)
                 return redirect()->intended(route('dashboard'));
             } elseif ($user->isEmployee()) {
-                // Employee anaanza kwenye Portal Attendance
                 return redirect()->intended(route('portal.attendance'));
             }
 
@@ -88,7 +86,7 @@ class LoginController extends Controller
         ])->onlyInput('email');
     }
 
-   public function logout(Request $request)
+    public function logout(Request $request)
     {
         if (Auth::check()) {
             $user = Auth::user();
@@ -99,10 +97,8 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        // Redirect bila headers za kuzuia cache - Middleware sasa inalinda routes zote
         return redirect()->route('login')->with('status', 'You have been logged out successfully.');
     }
-
 
     /**
      * Show forgot password form
@@ -119,33 +115,39 @@ class LoginController extends Controller
     {
         $request->validate(['email' => 'required|email']);
 
-        // Check if user exists and is active
-        $user = Employee::where('email', $request->email)->first();
+        try {
+            // Check if user exists and is active
+            $user = Employee::where('email', $request->email)->first();
 
-        if (!$user) {
-            return back()->withErrors(['email' => 'We can\'t find a user with that email address.']);
+            if (!$user) {
+                return back()->withErrors(['email' => 'We can\'t find a user with that email address.']);
+            }
+
+            if (!$user->isActive()) {
+                return back()->withErrors(['email' => 'Your account is not active. Please contact administrator.']);
+            }
+
+            // Generate reset token
+            $token = Str::random(60);
+
+            // Store token in password_resets table
+            DB::table('password_resets')->updateOrInsert(
+                ['email' => $request->email],
+                [
+                    'token' => Hash::make($token),
+                    'created_at' => Carbon::now()
+                ]
+            );
+
+            // Send reset email using Gmail
+            $this->sendResetEmail($user, $token);
+
+            return back()->with('status', 'We have emailed your password reset link!');
+
+        } catch (\Exception $e) {
+            \Log::error('Password reset error: ' . $e->getMessage());
+            return back()->withErrors(['email' => 'Failed to send reset email. Please try again later.']);
         }
-
-        if (!$user->isActive()) {
-            return back()->withErrors(['email' => 'Your account is not active. Please contact administrator.']);
-        }
-
-        // Generate reset token
-        $token = Str::random(60);
-
-        // Store token in password_resets table
-        DB::table('password_resets')->updateOrInsert(
-            ['email' => $request->email],
-            [
-                'token' => Hash::make($token),
-                'created_at' => Carbon::now()
-            ]
-        );
-
-        // Send reset email
-        $this->sendResetEmail($user, $token);
-
-        return back()->with('status', 'We have emailed your password reset link!');
     }
 
     /**
@@ -167,68 +169,143 @@ class LoginController extends Controller
             'password' => 'required|confirmed|min:8',
         ]);
 
-        // Verify token
-        $resetRecord = DB::table('password_resets')
-            ->where('email', $request->email)
-            ->first();
+        try {
+            // Verify token
+            $resetRecord = DB::table('password_resets')
+                ->where('email', $request->email)
+                ->first();
 
-        if (!$resetRecord) {
-            return back()->withErrors(['email' => 'Invalid reset token.']);
-        }
+            if (!$resetRecord) {
+                return back()->withErrors(['email' => 'Invalid reset token.']);
+            }
 
-        // Check if token is valid (within 60 minutes)
-        if (Carbon::parse($resetRecord->created_at)->addMinutes(60)->isPast()) {
+            // Check if token is valid (within 60 minutes)
+            if (Carbon::parse($resetRecord->created_at)->addMinutes(60)->isPast()) {
+                DB::table('password_resets')->where('email', $request->email)->delete();
+                return back()->withErrors(['email' => 'Reset token has expired.']);
+            }
+
+            // Verify token matches
+            if (!Hash::check($request->token, $resetRecord->token)) {
+                return back()->withErrors(['email' => 'Invalid reset token.']);
+            }
+
+            // Update user password
+            $user = Employee::where('email', $request->email)->first();
+
+            if (!$user) {
+                return back()->withErrors(['email' => 'We can\'t find a user with that email address.']);
+            }
+
+            $user->update([
+                'password' => Hash::make($request->password)
+            ]);
+
+            $user->updatePasswordChangedAt();
+
+            // Delete used token
             DB::table('password_resets')->where('email', $request->email)->delete();
-            return back()->withErrors(['email' => 'Reset token has expired.']);
+
+            // Log the user in automatically after password reset
+            Auth::login($user);
+
+            return redirect()->route('dashboard')->with('status', 'Password reset successfully!');
+
+        } catch (\Exception $e) {
+            \Log::error('Password reset error: ' . $e->getMessage());
+            return back()->withErrors(['email' => 'Failed to reset password. Please try again.']);
         }
-
-        // Verify token matches
-        if (!Hash::check($request->token, $resetRecord->token)) {
-            return back()->withErrors(['email' => 'Invalid reset token.']);
-        }
-
-        // Update user password
-        $user = Employee::where('email', $request->email)->first();
-
-        if (!$user) {
-            return back()->withErrors(['email' => 'We can\'t find a user with that email address.']);
-        }
-
-        $user->update([
-            'password' => Hash::make($request->password)
-        ]);
-
-        $user->updatePasswordChangedAt();
-
-        // Delete used token
-        DB::table('password_resets')->where('email', $request->email)->delete();
-
-        // Log the user in automatically after password reset
-        Auth::login($user);
-
-        return redirect()->route('dashboard')->with('status', 'Password reset successfully!');
     }
 
     /**
-     * Send password reset email
+     * Send password reset email using Gmail SMTP
      */
     private function sendResetEmail($user, $token)
     {
-        // In a real application, you would send an email here
-        // For now, we'll log the reset link
-        $resetLink = route('password.reset', ['token' => $token, 'email' => $user->email]);
+        try {
+            $resetLink = route('password.reset', ['token' => $token, 'email' => $user->email]);
 
-        \Log::info("Password reset link for {$user->email}: {$resetLink}");
+            // Send email using Laravel Mail with Gmail SMTP
+            Mail::send('emails.password-reset', [
+                'user' => $user,
+                'resetLink' => $resetLink,
+                'expiryTime' => now()->addMinutes(60)->format('F j, Y, g:i A'),
+                'token' => $token // For debugging purposes
+            ], function ($message) use ($user) {
+                $message->to($user->email);
+                $message->subject('🔐 Password Reset Request - ' . config('app.name'));
+                $message->from(config('mail.from.address'), config('mail.from.name'));
+            });
 
-        // Example email sending (uncomment when you have mail configured)
-        /*
-        Mail::send('emails.password-reset', [
-            'user' => $user,
-            'resetLink' => $resetLink
-        ], function ($message) use ($user) {
-            $message->to($user->email);
-            $message->subject('Password Reset Request');
-        });
-        */
+            // Log successful email sending
+            \Log::info("✅ Password reset email sent via Gmail to: {$user->email}");
+            \Log::info("📧 Reset link: {$resetLink}");
+
+            return true;
+
+        } catch (\Exception $e) {
+            // Log the error details
+            \Log::error("❌ Failed to send password reset email to {$user->email}: " . $e->getMessage());
+            \Log::error("📧 Error details: " . $e->getFile() . ':' . $e->getLine());
+            
+            throw new \Exception('Failed to send email. Please check your email configuration.');
+        }
+    }
+
+    /**
+     * Test email configuration
+     */
+    public function testEmail(Request $request)
+    {
+        try {
+            $user = Employee::first();
+            
+            if (!$user) {
+                return response()->json(['error' => 'No user found in database'], 404);
+            }
+
+            $token = Str::random(60);
+            $resetLink = route('password.reset', ['token' => $token, 'email' => $user->email]);
+
+            Mail::send('emails.password-reset', [
+                'user' => $user,
+                'resetLink' => $resetLink,
+                'expiryTime' => now()->addMinutes(60)->format('F j, Y, g:i A')
+            ], function ($message) use ($user) {
+                $message->to($user->email);
+                $message->subject('🧪 Test Email - ' . config('app.name'));
+                $message->from(config('mail.from.address'), config('mail.from.name'));
+            });
+
+            \Log::info("✅ Test email sent successfully to: {$user->email}");
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Test email sent successfully!',
+                'recipient' => $user->email,
+                'mail_config' => [
+                    'driver' => config('mail.default'),
+                    'host' => config('mail.mailers.smtp.host'),
+                    'port' => config('mail.mailers.smtp.port'),
+                    'from_address' => config('mail.from.address'),
+                    'from_name' => config('mail.from.name')
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("❌ Test email failed: " . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'mail_config' => [
+                    'driver' => config('mail.default'),
+                    'host' => config('mail.mailers.smtp.host'),
+                    'port' => config('mail.mailers.smtp.port'),
+                    'from_address' => config('mail.from.address'),
+                    'from_name' => config('mail.from.name')
+                ]
+            ], 500);
+        }
     }
 }

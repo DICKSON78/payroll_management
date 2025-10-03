@@ -10,6 +10,7 @@ use App\Models\Transaction;
 use App\Models\PayrollAlert;
 use App\Models\Allowance;
 use App\Models\Deduction;
+use App\Models\RetroactiveAdjustment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -18,7 +19,6 @@ use Illuminate\Routing\Controller;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 
 class PayrollController extends Controller
@@ -41,29 +41,72 @@ class PayrollController extends Controller
 
         $unread_alerts_count = PayrollAlert::where('status', 'unread')->count();
 
-        // Admin/HR can see all payrolls
-        $payrolls = Payroll::with('employee')
-            ->orderBy('created_at', 'desc')
+        // PAYROLLS - With all necessary employee data
+        $payrolls = Payroll::select(
+                'payrolls.*',
+                'employees.department',
+                'employees.position',
+                'employees.email',
+                'employees.phone',
+                'employees.bank_name',
+                'employees.account_number'
+            )
+            ->leftJoin('employees', 'payrolls.employee_id', '=', 'employees.employee_id')
+            ->orderBy('payrolls.created_at', 'desc')
             ->paginate(10);
 
-        $payroll_alerts = PayrollAlert::with('employee')
-            ->whereIn('status', ['Unread', 'Read'])
-            ->orderBy('created_at', 'desc')
+        // PAYROLL ALERTS - With all necessary employee data
+        $payroll_alerts = PayrollAlert::select(
+                'payroll_alerts.*',
+                'employees.department',
+                'employees.position',
+                'employees.email',
+                'employees.name as employee_name'
+            )
+            ->leftJoin('employees', 'payroll_alerts.employee_id', '=', 'employees.employee_id')
+            ->whereIn('payroll_alerts.status', ['Unread', 'Read'])
+            ->orderBy('payroll_alerts.created_at', 'desc')
             ->paginate(10);
 
-        $employees = Employee::all();
-        $transactions = Transaction::with('employee')
-            ->orderBy('transaction_date', 'desc')
+        // EMPLOYEES - All active employees with complete data
+        $employees = Employee::where('status', 'active')
+            ->select(
+                'employee_id',
+                'name',
+                'email',
+                'department',
+                'position',
+                'base_salary',
+                'bank_name',
+                'account_number',
+                'phone',
+                'status'
+            )
+            ->get();
+
+        // TRANSACTIONS - With all necessary employee data
+        $transactions = Transaction::select(
+                'transactions.*',
+                'employees.department',
+                'employees.position',
+                'employees.email'
+            )
+            ->leftJoin('employees', 'transactions.employee_id', '=', 'employees.employee_id')
+            ->orderBy('transactions.transaction_date', 'desc')
             ->paginate(10);
 
         $departments = Employee::distinct()->pluck('department');
         $settings = $this->getSettings();
-        $allowances = Allowance::where('active', 1)->get();
-        $deductions = Deduction::where('active', 1)->get();
+        $allowances = Allowance::where('active', 1)->whereNull('deleted_at')->get();
+        $deductions = Deduction::where('active', 1)->whereNull('deleted_at')->get();
         $activeTab = $request->query('tab', 'payroll');
 
-        // Add distinct periods for revert dropdown
         $periods = Payroll::select('period')->distinct()->orderBy('period', 'desc')->pluck('period');
+
+        // Get retroactive adjustments for display
+        $retroAdjustments = RetroactiveAdjustment::with(['employee', 'creator'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
 
         return view('dashboard.payroll', compact(
             'payrolls',
@@ -76,7 +119,8 @@ class PayrollController extends Controller
             'allowances',
             'deductions',
             'activeTab',
-            'periods'
+            'periods',
+            'retroAdjustments'
         ));
     }
 
@@ -94,9 +138,20 @@ class PayrollController extends Controller
         }
 
         try {
-            // Query by payroll_id, case-insensitive
-            $payroll = Payroll::with('employee')
-                ->whereRaw('LOWER(payroll_id) = ?', [strtolower($id)])
+            $payroll = Payroll::select(
+                    'payrolls.*',
+                    'employees.department',
+                    'employees.position',
+                    'employees.email',
+                    'employees.phone',
+                    'employees.bank_name',
+                    'employees.account_number',
+                    'employees.nssf_number',
+                    'employees.nhif_number',
+                    'employees.tin_number'
+                )
+                ->leftJoin('employees', 'payrolls.employee_id', '=', 'employees.employee_id')
+                ->whereRaw('LOWER(payrolls.payroll_id) = ?', [strtolower($id)])
                 ->firstOrFail();
 
             return response()->json([
@@ -106,11 +161,23 @@ class PayrollController extends Controller
                     'period' => $payroll->period,
                     'net_salary' => $payroll->net_salary,
                     'status' => $payroll->status,
-                    'employee_name' => $payroll->employee_name ?? ($payroll->employee->name ?? 'N/A'),
+                    'employee_name' => $payroll->employee_name,
+                    'employee_id' => $payroll->employee_id,
+                    'department' => $payroll->department,
+                    'position' => $payroll->position,
+                    'email' => $payroll->email,
+                    'phone' => $payroll->phone,
                     'base_salary' => $payroll->base_salary,
                     'allowances' => $payroll->allowances,
                     'deductions' => $payroll->deductions,
+                    'total_amount' => $payroll->total_amount,
+                    'employer_contributions' => $payroll->employer_contributions,
                     'payment_method' => $payroll->payment_method,
+                    'bank_name' => $payroll->bank_name,
+                    'account_number' => $payroll->account_number,
+                    'nssf_number' => $payroll->nssf_number,
+                    'nhif_number' => $payroll->nhif_number,
+                    'tin_number' => $payroll->tin_number,
                 ]
             ]);
         } catch (\Exception $e) {
@@ -140,20 +207,46 @@ class PayrollController extends Controller
             ], 403);
         }
 
-        $transaction = Transaction::with('employee')->where('transaction_id', $id)->firstOrFail();
-        return response()->json([
-            'success' => true,
-            'transaction' => [
-                'transaction_id' => $transaction->transaction_id,
-                'employee_name' => $transaction->employee_name ?? 'N/A',
-                'amount' => $transaction->amount,
-                'transaction_date' => $transaction->transaction_date,
-                'status' => $transaction->status,
-                'type' => $transaction->type,
-                'payment_method' => $transaction->payment_method,
-                'description' => $transaction->description,
-            ]
-        ]);
+        try {
+            $transaction = Transaction::select(
+                    'transactions.*',
+                    'employees.department',
+                    'employees.position',
+                    'employees.email',
+                    'employees.phone',
+                    'employees.bank_name',
+                    'employees.account_number'
+                )
+                ->leftJoin('employees', 'transactions.employee_id', '=', 'employees.employee_id')
+                ->where('transactions.transaction_id', $id)
+                ->firstOrFail();
+
+            return response()->json([
+                'success' => true,
+                'transaction' => [
+                    'transaction_id' => $transaction->transaction_id,
+                    'employee_name' => $transaction->employee_name,
+                    'employee_id' => $transaction->employee_id,
+                    'department' => $transaction->department,
+                    'position' => $transaction->position,
+                    'email' => $transaction->email,
+                    'phone' => $transaction->phone,
+                    'amount' => $transaction->amount,
+                    'transaction_date' => $transaction->transaction_date,
+                    'status' => $transaction->status,
+                    'type' => $transaction->type,
+                    'payment_method' => $transaction->payment_method,
+                    'description' => $transaction->description,
+                    'bank_name' => $transaction->bank_name,
+                    'account_number' => $transaction->account_number,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transaction record not found'
+            ], 404);
+        }
     }
 
     /**
@@ -169,17 +262,42 @@ class PayrollController extends Controller
             ], 403);
         }
 
-        $alert = PayrollAlert::with('employee')->where('alert_id', $id)->firstOrFail();
-        return response()->json([
-            'success' => true,
-            'alert' => [
-                'alert_id' => $alert->alert_id,
-                'employee_name' => $alert->employee->name ?? 'N/A',
-                'type' => $alert->type,
-                'message' => $alert->message,
-                'status' => $alert->status,
-            ]
-        ]);
+        try {
+            $alert = PayrollAlert::select(
+                    'payroll_alerts.*',
+                    'employees.department',
+                    'employees.position',
+                    'employees.email',
+                    'employees.phone',
+                    'employees.name as employee_name'
+                )
+                ->leftJoin('employees', 'payroll_alerts.employee_id', '=', 'employees.employee_id')
+                ->where('payroll_alerts.alert_id', $id)
+                ->firstOrFail();
+
+            return response()->json([
+                'success' => true,
+                'alert' => [
+                    'alert_id' => $alert->alert_id,
+                    'employee_name' => $alert->employee_name,
+                    'employee_id' => $alert->employee_id,
+                    'department' => $alert->department,
+                    'position' => $alert->position,
+                    'email' => $alert->email,
+                    'phone' => $alert->phone,
+                    'type' => $alert->type,
+                    'message' => $alert->message,
+                    'status' => $alert->status,
+                    'created_at' => $alert->created_at,
+                    'metadata' => $alert->metadata,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Alert record not found'
+            ], 404);
+        }
     }
 
     /**
@@ -191,622 +309,1094 @@ class PayrollController extends Controller
         if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized. Only Admin and HR can mark alerts as read.'
+                'message' => 'Unauthorized access.'
             ], 403);
-        }
-
-        $alert = PayrollAlert::where('alert_id', $id)->firstOrFail();
-        $alert->update(['status' => 'Read']);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Alert marked as read.'
-        ]);
-    }
-
-    /**
-     * Run payroll - Admin and HR only
-     */
-    public function run(Request $request)
-    {
-        $user = Auth::user();
-        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. Only Admin and HR can run payroll.'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'payroll_period' => 'required|date_format:Y-m-d',
-            'employee_selection' => 'required|in:all,single',
-            'employee_id' => 'required_if:employee_selection,single|exists:employees,id',
-            'nssf_rate' => 'required|numeric|min:0',
-            'nhif_rate' => 'required|numeric|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => implode(', ', $validator->errors()->all())
-            ], 422);
-        }
-
-        $period = Carbon::parse($request->payroll_period)->startOfMonth();
-        $employees = $request->employee_selection === 'all'
-            ? Employee::where('status', 'active')->get()
-            : Employee::where('id', $request->employee_id)->where('status', 'active')->get();
-
-        if ($employees->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active employees found for payroll processing.'
-            ], 422);
         }
 
         try {
-            DB::beginTransaction();
+            $alert = PayrollAlert::where('alert_id', $id)->firstOrFail();
+            
+            // Get employee data before marking as read
+            $employee = Employee::where('employee_id', $alert->employee_id)->first();
+            $employeeDataBefore = $employee ? [
+                'base_salary' => $employee->base_salary,
+                'allowances' => $employee->allowances,
+                'deductions' => $employee->deductions
+            ] : null;
 
-            $processedCount = 0;
+            $alert->update(['status' => 'Read']);
 
-            foreach ($employees as $employee) {
-                // Check if payroll already exists for this employee and period
-                // ONLY check if we haven't reverted (i.e., don't prevent re-running after revert)
-                $existingPayroll = Payroll::where('employee_id', $employee->id)
-                    ->where('period', $period->format('Y-m'))
-                    ->first();
+            // Get employee data after marking as read
+            $employee->refresh();
+            $employeeDataAfter = $employee ? [
+                'base_salary' => $employee->base_salary,
+                'allowances' => $employee->allowances,
+                'deductions' => $employee->deductions
+            ] : null;
 
-                // If payroll exists and we're not in a revert scenario, prevent duplication
-                if ($existingPayroll) {
-                    // Check if this is a re-run after revert by looking for revert indicator
-                    $wasReverted = PayrollAlert::where('employee_id', $employee->id)
-                        ->where('type', 'like', '%Revert%')
-                        ->where('created_at', '>=', now()->subHours(2)) // Reverted in last 2 hours
-                        ->exists();
+            return response()->json([
+                'success' => true,
+                'message' => 'Alert marked as read.',
+                'employee_changes' => [
+                    'before' => $employeeDataBefore,
+                    'after' => $employeeDataAfter
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to mark alert as read.'
+            ], 500);
+        }
+    }
 
-                    if (!$wasReverted) {
-                        if ($request->employee_selection === 'single') {
-                            return response()->json([
-                                'success' => false,
-                                'message' => 'Payroll already processed for this employee in this period. No need to repeat.'
-                            ], 422);
-                        }
-                        // For 'all', skip
-                        continue;
-                    }
+    /**
+     * Run payroll processing - FIXED VALIDATION RULES
+     */
+public function run(Request $request)
+{
+    $user = Auth::user();
+    if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+        return redirect()->back()->with('error', 'Unauthorized. Only Admin and HR can run payroll.');
+    }
+
+    Log::info('Payroll run request data:', $request->all());
+
+    $validator = Validator::make($request->all(), [
+        'payroll_period' => 'required|date_format:Y-m-d',
+        'employee_selection' => 'required|in:all,single,multiple',
+        'employee_id' => 'sometimes|required_if:employee_selection,single',
+        'employee_ids' => 'sometimes|required_if:employee_selection,multiple|array',
+        'employee_ids.*' => 'sometimes',
+        'nssf_rate' => 'required|numeric|min:0|max:100',
+        'nhif_rate' => 'required|numeric|min:0|max:100',
+    ]);
+
+    if ($validator->fails()) {
+        Log::error('Payroll validation failed:', $validator->errors()->toArray());
+        return redirect()->back()
+            ->withErrors($validator)
+            ->withInput();
+    }
+
+    $period = Carbon::parse($request->payroll_period)->format('Y-m');
+    $periodDisplay = Carbon::parse($request->payroll_period)->format('F Y');
+
+    // Determine employees based on selection
+    $employees = collect();
+    $selectionType = "";
+
+    try {
+        if ($request->employee_selection === 'all') {
+            $employees = Employee::where('status', 'active')->get();
+            $selectionType = "all active employees";
+            Log::info("Selected all active employees. Count: " . $employees->count());
+        } elseif ($request->employee_selection === 'single') {
+            if (empty($request->employee_id)) {
+                return redirect()->back()
+                    ->with('error', 'Please select an employee for single selection.')
+                    ->withInput();
+            }
+            $employee = Employee::where('employee_id', $request->employee_id)->where('status', 'active')->first();
+            if (!$employee) {
+                return redirect()->back()
+                    ->with('error', 'Selected employee not found or inactive.')
+                    ->withInput();
+            }
+            $employees = collect([$employee]);
+            $selectionType = "single employee";
+            Log::info("Selected single employee: " . $request->employee_id);
+        } else {
+            $employeeIds = $request->employee_ids ?? [];
+            if (empty($employeeIds)) {
+                return redirect()->back()
+                    ->with('error', 'Please select at least one employee for multiple selection.')
+                    ->withInput();
+            }
+            $employees = Employee::whereIn('employee_id', $employeeIds)->where('status', 'active')->get();
+            if ($employees->count() !== count($employeeIds)) {
+                return redirect()->back()
+                    ->with('error', 'One or more selected employees not found or inactive.')
+                    ->withInput();
+            }
+            $selectionType = "multiple employees (" . count($employees) . " employees)";
+            Log::info("Selected multiple employees. Count: " . $employees->count());
+        }
+
+        if ($employees->isEmpty()) {
+            Log::warning('No active employees found for payroll processing');
+            return redirect()->back()
+                ->with('warning', 'No active employees found for payroll processing.')
+                ->withInput();
+        }
+
+        DB::beginTransaction();
+
+        $processedCount = 0;
+        $failedEmployees = [];
+
+        foreach ($employees as $employee) {
+            try {
+                Log::info("Processing payroll for employee: " . $employee->employee_id . " - " . $employee->name);
+                Log::info("Current employee data - Base Salary: " . $employee->base_salary . ", Allowances: " . $employee->allowances . ", Deductions: " . $employee->deductions);
+
+                // USE CURRENT EMPLOYEE DATA (INCLUDING RETROACTIVE ADJUSTMENTS)
+                $baseSalary = $employee->base_salary ?? 0;
+                $currentAllowances = $employee->allowances ?? 0;
+                $currentDeductions = $employee->deductions ?? 0;
+
+                Log::info("Using current employee data - Base Salary: " . $baseSalary . ", Allowances: " . $currentAllowances);
+
+                if ($baseSalary <= 0) {
+                    throw new \Exception("Invalid base salary: " . $baseSalary);
                 }
 
-                // Calculate salary components for new payroll
-                $baseSalary = $employee->base_salary ?? 0;
-                $allowances = $this->calculateAllowances($employee);
-                $grossSalary = $baseSalary + array_sum(array_column($allowances, 'amount'));
-                $deductions = $this->calculateDeductions($employee, $grossSalary, $request->nssf_rate, $request->nhif_rate);
-                $netSalary = $grossSalary - array_sum(array_column($deductions, 'amount'));
+                // Calculate additional allowances from allowance table
+                $additionalAllowances = $this->calculateAllowances($employee);
+                $totalAdditionalAllowances = array_sum(array_column($additionalAllowances, 'amount'));
+                
+                // Total allowances = current allowances + additional allowances
+                $totalAllowances = $currentAllowances + $totalAdditionalAllowances;
+                $grossSalary = $baseSalary + $totalAllowances;
 
-                // Generate unique IDs using random strings
+                Log::info("Gross salary calculated - Base: " . $baseSalary . ", Allowances: " . $totalAllowances . ", Gross: " . $grossSalary);
+
+                if ($grossSalary <= 0) {
+                    throw new \Exception("Invalid gross salary: " . $grossSalary);
+                }
+
+                // Use rates from form input
+                $nssfRate = $request->nssf_rate;
+                $nhifRate = $request->nhif_rate;
+
+                Log::info("Using rates - NSSF: " . $nssfRate . "%, NHIF: " . $nhifRate . "%");
+
+                $deductions = $this->calculateDeductions($employee, $grossSalary, $nssfRate, $nhifRate);
+                $totalCalculatedDeductions = array_sum(array_column($deductions, 'amount'));
+                
+                // Total deductions = current deductions + calculated deductions
+                $totalDeductions = $currentDeductions + $totalCalculatedDeductions;
+                $netSalary = $grossSalary - $totalDeductions;
+
+                Log::info("Deductions - Current: " . $currentDeductions . ", Calculated: " . $totalCalculatedDeductions . ", Total: " . $totalDeductions . ", Net salary: " . $netSalary);
+
+                $employerContributions = $this->calculateEmployerContributions($grossSalary, $nssfRate, $nhifRate);
+                $totalEmployerContributions = array_sum(array_column($employerContributions, 'amount'));
+
                 $payrollId = $this->generateRandomId('PAY');
                 $payslipId = $this->generateRandomId('PSLIP');
                 $transactionId = $this->generateRandomId('TRX');
 
-                Log::info('Generating payroll for employee', [
-                    'employee_id' => $employee->id,
-                    'payroll_id' => $payrollId,
-                    'transaction_id' => $transactionId,
-                    'period' => $period->format('Y-m'),
-                ]);
+                // Count payrolls for this employee in this period
+                $payrollCount = Payroll::where('employee_id', $employee->employee_id)
+                    ->where('period', $period)
+                    ->count() + 1;
 
-                // Create payroll record
-                Payroll::create([
+                Log::info("Creating payroll record #" . $payrollCount . " for employee: " . $employee->employee_id);
+
+                // CREATE PAYROLL RECORD
+                $payrollData = [
                     'payroll_id' => $payrollId,
-                    'employee_id' => $employee->id,
+                    'employee_id' => $employee->employee_id,
                     'employee_name' => $employee->name,
-                    'period' => $period->format('Y-m'),
+                    'period' => $period,
                     'base_salary' => $baseSalary,
-                    'allowances' => array_sum(array_column($allowances, 'amount')),
+                    'allowances' => $totalAllowances,
                     'total_amount' => $grossSalary,
-                    'deductions' => array_sum(array_column($deductions, 'amount')),
+                    'deductions' => $totalDeductions,
                     'net_salary' => $netSalary,
+                    'employer_contributions' => $totalEmployerContributions,
                     'status' => 'Processed',
-                    'payment_method' => $employee->bank_name ? 'Bank Transfer' : null,
-                    'created_by' => $user->id
-                ]);
+                    'payment_method' => $employee->bank_name ? 'Bank Transfer' : 'Cash',
+                    'created_by' => $user->id,
+                ];
 
-                // Create payslip
-                Payslip::create([
+                $payroll = Payroll::create($payrollData);
+                Log::info("Payroll record created: " . $payrollId);
+
+                // CREATE PAYSLIP RECORD
+                $payslipData = [
                     'payslip_id' => $payslipId,
-                    'employee_id' => $employee->id,
+                    'employee_id' => $employee->employee_id,
                     'employee_name' => $employee->name,
-                    'period' => $period->format('Y-m'),
+                    'period' => $period,
                     'base_salary' => $baseSalary,
-                    'allowances' => array_sum(array_column($allowances, 'amount')),
-                    'deductions' => array_sum(array_column($deductions, 'amount')),
+                    'allowances' => $totalAllowances,
+                    'deductions' => $totalDeductions,
                     'net_salary' => $netSalary,
-                    'status' => 'Generated'
-                ]);
+                    'status' => 'Generated',
+                ];
 
-                // Create transaction
-                Transaction::create([
+                Payslip::create($payslipData);
+                Log::info("Payslip record created: " . $payslipId);
+
+                // CREATE TRANSACTION RECORD
+                $transactionDescription = "Salary payment for {$periodDisplay}";
+                
+                // Add note if there are retroactive adjustments
+                if ($currentAllowances > 0 || $currentDeductions > 0) {
+                    $adjustmentNotes = [];
+                    if ($currentAllowances > 0) {
+                        $adjustmentNotes[] = "includes retroactive allowances: TZS " . number_format($currentAllowances, 0);
+                    }
+                    if ($currentDeductions > 0) {
+                        $adjustmentNotes[] = "includes retroactive deductions: TZS " . number_format($currentDeductions, 0);
+                    }
+                    $transactionDescription .= " (" . implode(", ", $adjustmentNotes) . ")";
+                }
+
+                $transactionData = [
                     'transaction_id' => $transactionId,
-                    'employee_id' => $employee->id,
+                    'employee_id' => $employee->employee_id,
                     'employee_name' => $employee->name,
                     'type' => 'salary_payment',
                     'amount' => $netSalary,
                     'transaction_date' => now(),
                     'status' => 'Completed',
-                    'payment_method' => $employee->bank_name ? 'Bank Transfer' : null,
-                    'description' => "Salary payment for {$period->format('F Y')}"
-                ]);
+                    'payment_method' => $employee->bank_name ? 'Bank Transfer' : 'Cash',
+                    'description' => $transactionDescription
+                ];
 
-                // Check for alerts
-                if (array_sum(array_column($deductions, 'amount')) / $grossSalary > 0.5) {
+                Transaction::create($transactionData);
+                Log::info("Transaction record created: " . $transactionId);
+
+                // ALERT FOR HIGH DEDUCTIONS
+                if ($totalDeductions > 0 && ($totalDeductions / $grossSalary) > 0.5) {
                     $alertId = $this->generateRandomId('ALRT');
                     PayrollAlert::create([
                         'alert_id' => $alertId,
-                        'employee_id' => $employee->id,
+                        'employee_id' => $employee->employee_id,
                         'type' => 'High Deductions',
-                        'message' => "Deductions for {$employee->name} exceed 50% of gross salary for {$period->format('F Y')}.",
+                        'message' => "Deductions for {$employee->name} exceed 50% of gross salary for {$periodDisplay}.",
                         'status' => 'Unread'
                     ]);
+                    Log::info("High deduction alert created for employee: " . $employee->employee_id);
                 }
 
                 $processedCount++;
-            }
+                Log::info("Successfully processed payroll for employee: " . $employee->employee_id);
 
-            if ($processedCount === 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Payroll already processed for all selected employees in this period.'
-                ], 422);
-            }
-
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => 'Payroll processed successfully for ' . $processedCount . ' employees.'
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Payroll processing failed: ' . $e->getMessage(), [
-                'user_id' => $user->id,
-                'period' => $request->payroll_period,
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to process payroll: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Process retroactive pay - Admin and HR only
-     */
-    public function retro(Request $request)
-    {
-        $user = Auth::user();
-        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. Only Admin and HR can process retroactive pay.'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'retro_period' => 'required|date_format:Y-m-d',
-            'employee_selection' => 'required|in:all,single',
-            'employee_ids' => 'required_if:employee_selection,single|array',
-            'employee_ids.*' => 'exists:employees,id',
-            'adjustment_amount' => 'required|numeric|min:0',
-            'adjustment_reason' => 'required|string|max:255',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => implode(', ', $validator->errors()->all())
-            ], 422);
-        }
-
-        $period = Carbon::parse($request->retro_period)->startOfMonth();
-        $employees = $request->employee_selection === 'all'
-            ? Employee::where('status', 'active')->get()
-            : Employee::whereIn('id', $request->employee_ids)->where('status', 'active')->get();
-
-        if ($employees->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active employees found for retroactive pay processing.'
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $processedCount = 0;
-
-            foreach ($employees as $employee) {
-                $payroll = Payroll::where('employee_id', $employee->id)
-                    ->where('period', $period->format('Y-m'))
-                    ->first();
-
-                if (!$payroll) {
-                    if ($request->employee_selection === 'single') {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'No payroll record found for this employee in the specified period.'
-                        ], 422);
-                    }
-                    continue;
-                }
-
-                // Apply adjustment
-                $payroll->allowances += $request->adjustment_amount;
-                $payroll->total_amount += $request->adjustment_amount;
-                $payroll->net_salary += $request->adjustment_amount; // Assuming adjustment is post-deduction
-                $payroll->save();
-
-                // Update related transaction
-                $transaction = Transaction::where('employee_id', $employee->id)
-                    ->where('type', 'salary_payment')
-                    ->where('transaction_date', '>=', $period->startOfMonth())
-                    ->where('transaction_date', '<', $period->endOfMonth()->addDay())
-                    ->first();
-
-                if ($transaction) {
-                    $transaction->amount += $request->adjustment_amount;
-                    $transaction->description .= " (Retroactive adjustment: {$request->adjustment_reason})";
-                    $transaction->save();
-                }
-
-                // Create alert
-                $alertId = $this->generateRandomId('ALRT');
-                PayrollAlert::create([
-                    'alert_id' => $alertId,
-                    'employee_id' => $employee->id,
-                    'type' => 'Retroactive Adjustment',
-                    'message' => "Retroactive pay adjustment of TZS " . number_format($request->adjustment_amount, 0) . " applied for {$employee->name} in period {$period->format('F Y')}: {$request->adjustment_reason}",
-                    'status' => 'Unread'
-                ]);
-
-                $processedCount++;
-            }
-
-            if ($processedCount === 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No payroll records found for the selected employees in this period.'
-                ], 422);
-            }
-
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => 'Retroactive pay processed successfully for ' . $processedCount . ' employees.'
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Retroactive pay processing failed: ' . $e->getMessage(), [
-                'user_id' => $user->id,
-                'period' => $request->retro_period,
-                'amount' => $request->adjustment_amount,
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to process retroactive pay: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Revert a specific payroll or payrolls for a period and optional employee - Admin and HR only
-     */
-    public function revert(Request $request, $payroll_id = null)
-    {
-        $user = Auth::user();
-        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized. Only Admin and HR can revert payroll.'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'period' => 'required_without:payroll_id|date_format:Y-m',
-            'employee_id' => 'nullable|exists:employees,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => implode(', ', $validator->errors()->all())
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
-            // Handle period-based revert (with optional employee_id)
-            if ($request->has('period') && !empty($request->period)) {
-                $period = $request->period;
-                $query = Payroll::where('period', $period);
-
-                // If employee_id is provided, filter by employee
-                if ($request->has('employee_id') && !empty($request->employee_id)) {
-                    $query->where('employee_id', $request->employee_id);
-                }
-
-                $payrolls = $query->get();
-
-                if ($payrolls->isEmpty()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'No payroll records found for the specified period' . ($request->employee_id ? ' and employee.' : '.')
-                    ], 404);
-                }
-
-                $revertedCount = 0;
-
-                foreach ($payrolls as $payroll) {
-                    $this->deleteRelatedRecords($payroll);
-                    $payroll->delete();
-                    
-                    // Create revert alert to indicate this was reverted
-                    $alertId = $this->generateRandomId('ALRT');
-                    PayrollAlert::create([
-                        'alert_id' => $alertId,
-                        'employee_id' => $payroll->employee_id,
-                        'type' => 'Payroll Reverted',
-                        'message' => "Payroll {$payroll->payroll_id} for {$payroll->employee_name} in period {$period} has been reverted.",
-                        'status' => 'Read' // Mark as read since it's system-generated
-                    ]);
-                    
-                    $revertedCount++;
-                }
-
-                DB::commit();
-                return response()->json([
-                    'success' => true,
-                    'message' => "Successfully reverted {$revertedCount} payroll record(s) for period {$period}" . ($request->employee_id ? ' for the selected employee.' : '.')
+            } catch (\Exception $e) {
+                $errorMsg = $employee->name . " (" . $e->getMessage() . ")";
+                $failedEmployees[] = $errorMsg;
+                Log::error('Failed to process payroll for employee: ' . $employee->employee_id, [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
             }
-
-            // Handle single payroll revert
-            if (!$payroll_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Payroll ID is required for single payroll revert.'
-                ], 422);
-            }
-
-            // Find the specific payroll by payroll_id
-            $payroll = Payroll::whereRaw('LOWER(payroll_id) = ?', [strtolower($payroll_id)])->first();
-            if (!$payroll) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Payroll record not found for the specified ID.'
-                ], 404);
-            }
-
-            $this->deleteRelatedRecords($payroll);
-            $payroll->delete();
-            
-            // Create revert alert
-            $alertId = $this->generateRandomId('ALRT');
-            PayrollAlert::create([
-                'alert_id' => $alertId,
-                'employee_id' => $payroll->employee_id,
-                'type' => 'Payroll Reverted',
-                'message' => "Payroll {$payroll_id} for {$payroll->employee_name} has been reverted.",
-                'status' => 'Read'
-            ]);
-
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => "Payroll record {$payroll_id} has been reverted successfully."
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Payroll revert failed: ' . $e->getMessage(), [
-                'user_id' => $user->id,
-                'payroll_id' => $payroll_id,
-                'period' => $request->period ?? 'N/A',
-                'employee_id' => $request->employee_id ?? 'N/A',
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to revert payroll: ' . $e->getMessage()
-            ], 500);
         }
+
+        if ($processedCount === 0) {
+            DB::rollBack();
+            $errorMessage = 'No payroll records were processed due to errors. ';
+            if (!empty($failedEmployees)) {
+                $errorMessage .= 'Errors: ' . implode(', ', $failedEmployees);
+            }
+            return redirect()->back()
+                ->with('error', $errorMessage)
+                ->withInput();
+        }
+
+        DB::commit();
+
+        $message = "Payroll processed successfully for {$processedCount} employee(s) for {$periodDisplay} ({$selectionType}).";
+        $message .= " All retroactive adjustments have been included in the calculations.";
+
+        if (!empty($failedEmployees)) {
+            $message .= " Failed for " . count($failedEmployees) . " employee(s): " . implode(', ', $failedEmployees);
+            // NOTIFICATION: Payroll imekamilika kwa onyo
+            return redirect()->route('payroll')
+                ->with('warning', $message);
+        }
+
+        // NOTIFICATION: Payroll imekamilika
+        return redirect()->route('payroll')
+            ->with('success', $message);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Payroll processing failed: ' . $e->getMessage(), [
+            'user_id' => $user->id,
+            'period' => $period,
+            'trace' => $e->getTraceAsString()
+        ]);
+        // NOTIFICATION: Payroll imeshindwa
+        return redirect()->back()
+            ->with('error', 'Failed to process payroll: ' . $e->getMessage())
+            ->withInput();
     }
-        public function revertAll(Request $request)
+}
+
+    /**
+     * Process retroactive pay - COMPLETE FIXED VERSION
+     */
+public function retro(Request $request)
 {
     $user = Auth::user();
     if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized. Only Admin and HR can revert all data.'
-        ], 403);
+        return redirect()->back()->with('error', 'Unauthorized. Only Admin and HR can process retroactive pay.');
     }
 
     $validator = Validator::make($request->all(), [
-        'revert_types' => 'required|array',
-        'revert_types.*' => 'in:payroll,transactions,alerts,retroactive',
-        'period' => 'nullable|date_format:Y-m',
-        'employee_id' => 'nullable|exists:employees,id',
+        'retro_period' => 'required|date_format:Y-m-d',
+        'employee_selection' => 'required|in:all,single,multiple',
+        'employee_id' => 'sometimes|required_if:employee_selection,single',
+        'employee_ids' => 'sometimes|required_if:employee_selection,multiple|array',
+        'employee_ids.*' => 'sometimes',
+        'adjustment_type' => 'required|in:allowance,deduction,salary_adjustment',
+        'adjustment_amount' => 'required|numeric',
+        'adjustment_reason' => 'required|string|max:255',
     ]);
 
     if ($validator->fails()) {
-        return response()->json([
-            'success' => false,
-            'message' => implode(', ', $validator->errors()->all())
-        ], 422);
+        return redirect()->back()
+            ->withErrors($validator)
+            ->withInput();
+    }
+
+    $period = Carbon::parse($request->retro_period)->format('Y-m');
+    $periodDisplay = Carbon::parse($request->retro_period)->format('F Y');
+    $adjustmentType = $request->adjustment_type;
+    $adjustmentAmount = $request->adjustment_amount;
+    $adjustmentReason = $request->adjustment_reason;
+
+    $employees = collect();
+    $selectionType = "";
+
+    try {
+        // Employee selection logic
+        if ($request->employee_selection === 'all') {
+            $employees = Employee::where('status', 'active')->get();
+            $selectionType = "all active employees";
+        } elseif ($request->employee_selection === 'single') {
+            if (empty($request->employee_id)) {
+                return redirect()->back()->with('error', 'Please select an employee.')->withInput();
+            }
+            $employee = Employee::where('employee_id', $request->employee_id)->where('status', 'active')->first();
+            if (!$employee) {
+                return redirect()->back()->with('error', 'Selected employee not found or inactive.')->withInput();
+            }
+            $employees = collect([$employee]);
+            $selectionType = "single employee";
+        } else {
+            $employeeIds = $request->employee_ids ?? [];
+            if (empty($employeeIds)) {
+                return redirect()->back()->with('error', 'Please select employees.')->withInput();
+            }
+            $employees = Employee::whereIn('employee_id', $employeeIds)->where('status', 'active')->get();
+            if ($employees->count() !== count($employeeIds)) {
+                return redirect()->back()->with('error', 'One or more selected employees not found or inactive.')->withInput();
+            }
+            $selectionType = "multiple employees (" . count($employees) . " employees)";
+        }
+
+        if ($employees->isEmpty()) {
+            return redirect()->back()->with('error', 'No active employees found.')->withInput();
+        }
+
+        DB::beginTransaction();
+
+        $processedCount = 0;
+        $failedEmployees = [];
+        $recalculatedPayrolls = [];
+        $recalculationDetails = [];
+
+        foreach ($employees as $employee) {
+            try {
+                // Store original values for comparison
+                $originalBaseSalary = $employee->base_salary;
+                $originalAllowances = $employee->allowances;
+                $originalDeductions = $employee->deductions;
+
+                Log::info("Starting retroactive adjustment for employee: " . $employee->employee_id, [
+                    'adjustment_type' => $adjustmentType,
+                    'adjustment_amount' => $adjustmentAmount,
+                    'original_values' => [
+                        'base_salary' => $originalBaseSalary,
+                        'allowances' => $originalAllowances,
+                        'deductions' => $originalDeductions
+                    ]
+                ]);
+
+                // CREATE RETROACTIVE ADJUSTMENT RECORD
+                $adjustmentId = $this->generateRandomId('RADJ');
+
+                $retroAdjustment = RetroactiveAdjustment::create([
+                    'adjustment_id' => $adjustmentId,
+                    'employee_id' => $employee->id,
+                    'period' => $period,
+                    'type' => $adjustmentType,
+                    'amount' => $adjustmentAmount,
+                    'reason' => $adjustmentReason,
+                    'status' => 'pending',
+                    'created_by' => $user->id,
+                ]);
+
+                // IMMEDIATELY APPLY THE ADJUSTMENT TO EMPLOYEE RECORD
+                $this->applyRetroactiveAdjustment($employee, $adjustmentType, $adjustmentAmount);
+
+                // RELOAD EMPLOYEE TO GET UPDATED VALUES
+                $employee->refresh();
+
+                Log::info("After retroactive adjustment - Employee refreshed", [
+                    'employee_id' => $employee->employee_id,
+                    'new_base_salary' => $employee->base_salary,
+                    'new_allowances' => $employee->allowances,
+                    'new_deductions' => $employee->deductions
+                ]);
+
+                // RECALCULATE EXISTING PAYROLLS FOR THIS EMPLOYEE IN THE AFFECTED PERIOD
+                $affectedPayrolls = Payroll::where('employee_id', $employee->employee_id)
+                    ->where('period', $period)
+                    ->get();
+
+                Log::info("Found {$affectedPayrolls->count()} payrolls to recalculate for period: {$period}");
+
+                $employeeRecalculationDetails = [];
+
+                foreach ($affectedPayrolls as $payroll) {
+                    $recalculatedData = $this->recalculatePayroll($payroll, $employee);
+                    
+                    if ($recalculatedData) {
+                        // Store old values before update
+                        $oldPayrollData = [
+                            'base_salary' => $payroll->base_salary,
+                            'allowances' => $payroll->allowances,
+                            'deductions' => $payroll->deductions,
+                            'net_salary' => $payroll->net_salary,
+                        ];
+
+                        $payroll->update($recalculatedData);
+                        $recalculatedPayrolls[] = $payroll->payroll_id;
+                        
+                        // Store recalculation details
+                        $employeeRecalculationDetails[] = [
+                            'payroll_id' => $payroll->payroll_id,
+                            'old_values' => $oldPayrollData,
+                            'new_values' => $recalculatedData
+                        ];
+
+                        Log::info("Payroll successfully recalculated", [
+                            'payroll_id' => $payroll->payroll_id,
+                            'old_net_salary' => $oldPayrollData['net_salary'],
+                            'new_net_salary' => $recalculatedData['net_salary'],
+                            'changes' => [
+                                'base_salary' => $recalculatedData['base_salary'] - $oldPayrollData['base_salary'],
+                                'allowances' => $recalculatedData['allowances'] - $oldPayrollData['allowances'],
+                                'deductions' => $recalculatedData['deductions'] - $oldPayrollData['deductions'],
+                                'net_salary' => $recalculatedData['net_salary'] - $oldPayrollData['net_salary'],
+                            ]
+                        ]);
+                    } else {
+                        Log::error("Failed to recalculate payroll: " . $payroll->payroll_id);
+                    }
+                }
+
+                $recalculationDetails[$employee->employee_id] = $employeeRecalculationDetails;
+
+                // CREATE TRANSACTION RECORD
+                $transactionId = $this->generateRandomId('TRX');
+                $transactionType = $adjustmentType === 'deduction' ? 'retroactive_deduction' : 'retroactive_adjustment';
+
+                Transaction::create([
+                    'transaction_id' => $transactionId,
+                    'employee_id' => $employee->employee_id,
+                    'employee_name' => $employee->name,
+                    'type' => $transactionType,
+                    'amount' => $adjustmentAmount,
+                    'transaction_date' => now(),
+                    'status' => 'Completed',
+                    'payment_method' => 'Adjustment',
+                    'description' => "Retroactive {$adjustmentType} for {$periodDisplay}: {$adjustmentReason}. Payroll recalculated."
+                ]);
+
+                // CREATE ALERT WITH DETAILED CHANGES
+                $alertId = $this->generateRandomId('ALRT');
+                
+                $changeDetails = $this->getChangeDetails([
+                    'base_salary' => ['old' => $originalBaseSalary, 'new' => $employee->base_salary],
+                    'allowances' => ['old' => $originalAllowances, 'new' => $employee->allowances],
+                    'deductions' => ['old' => $originalDeductions, 'new' => $employee->deductions],
+                ]);
+
+                // Add payroll recalculation info to message
+                $recalcInfo = "";
+                if (!empty($employeeRecalculationDetails)) {
+                    $netSalaryChanges = array_map(function($detail) {
+                        return $detail['new_values']['net_salary'] - $detail['old_values']['net_salary'];
+                    }, $employeeRecalculationDetails);
+                    
+                    $totalNetChange = array_sum($netSalaryChanges);
+                    $recalcInfo = " Payrolls recalculated: " . count($employeeRecalculationDetails) . 
+                                 " | Net salary change: TZS " . number_format($totalNetChange, 0);
+                }
+
+                PayrollAlert::create([
+                    'alert_id' => $alertId,
+                    'employee_id' => $employee->employee_id,
+                    'type' => 'Retroactive Adjustment Applied',
+                    'message' => "Retroactive {$adjustmentType} of TZS " . number_format($adjustmentAmount, 0) . 
+                                " has been applied to {$employee->name}'s record for period {$periodDisplay}. " .
+                                "Reason: {$adjustmentReason}. Changes: {$changeDetails}.{$recalcInfo}",
+                    'status' => 'Unread',
+                    'metadata' => json_encode([
+                        'adjustment_id' => $adjustmentId,
+                        'adjustment_type' => $adjustmentType,
+                        'amount' => $adjustmentAmount,
+                        'period' => $periodDisplay,
+                        'changes' => [
+                            'base_salary' => ['old' => $originalBaseSalary, 'new' => $employee->base_salary],
+                            'allowances' => ['old' => $originalAllowances, 'new' => $employee->allowances],
+                            'deductions' => ['old' => $originalDeductions, 'new' => $employee->deductions],
+                        ],
+                        'recalculated_payrolls' => $recalculatedPayrolls,
+                        'recalculation_details' => $employeeRecalculationDetails,
+                        'employee_name' => $employee->name
+                    ])
+                ]);
+
+                // UPDATE RETROACTIVE ADJUSTMENT STATUS TO APPLIED
+                $retroAdjustment->update([
+                    'status' => 'applied',
+                    'applied_at' => now()
+                ]);
+
+                $processedCount++;
+                Log::info("Retroactive adjustment completed successfully for employee: " . $employee->employee_id, [
+                    'adjustment_id' => $adjustmentId,
+                    'type' => $adjustmentType,
+                    'amount' => $adjustmentAmount,
+                    'changes' => [
+                        'base_salary' => ['old' => $originalBaseSalary, 'new' => $employee->base_salary],
+                        'allowances' => ['old' => $originalAllowances, 'new' => $employee->allowances],
+                        'deductions' => ['old' => $originalDeductions, 'new' => $employee->deductions],
+                    ],
+                    'recalculated_payrolls_count' => count($employeeRecalculationDetails)
+                ]);
+
+            } catch (\Exception $e) {
+                $failedEmployees[] = $employee->name . " (" . $e->getMessage() . ")";
+                Log::error('Failed to process retroactive adjustment for employee: ' . $employee->employee_id, [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+        }
+
+        DB::commit();
+
+        $message = "Retroactive {$adjustmentType} applied successfully for {$processedCount} employee(s) for {$periodDisplay} ({$selectionType}). ";
+        $message .= "Employee records have been updated and payrolls have been recalculated.";
+
+        if (!empty($recalculatedPayrolls)) {
+            $message .= " Recalculated " . count($recalculatedPayrolls) . " payroll record(s).";
+        }
+
+        if (!empty($failedEmployees)) {
+            $message .= " Failed for " . count($failedEmployees) . " employee(s): " . implode(', ', $failedEmployees);
+            // NOTIFICATION: Marekebisho yamekamilika kwa onyo
+            return redirect()->route('payroll')
+                ->with('warning', $message);
+        }
+
+        // NOTIFICATION: Marekebisho ya nyuma yamekamilika
+        return redirect()->route('payroll')
+            ->with('success', $message);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Retroactive pay processing failed: ' . $e->getMessage(), [
+            'user_id' => $user->id,
+            'period' => $period,
+            'adjustment_type' => $request->adjustment_type,
+            'amount' => $request->adjustment_amount,
+            'trace' => $e->getTraceAsString()
+        ]);
+        // NOTIFICATION: Marekebisho yameshindwa
+        return redirect()->back()
+            ->with('error', 'Failed to process retroactive pay: ' . $e->getMessage())
+            ->withInput();
+    }
+}
+
+    /**
+     * Recalculate payroll after retroactive adjustment - COMPLETE VERSION
+     */
+    private function recalculatePayroll($payroll, $employee)
+    {
+        try {
+            Log::info("Starting payroll recalculation for payroll: " . $payroll->payroll_id, [
+                'employee_id' => $employee->employee_id,
+                'current_base_salary' => $employee->base_salary,
+                'current_allowances' => $employee->allowances,
+                'current_deductions' => $employee->deductions
+            ]);
+
+            // Use current employee data (with retroactive adjustments)
+            $baseSalary = $employee->base_salary ?? 0;
+            $currentAllowances = $employee->allowances ?? 0;
+            $currentDeductions = $employee->deductions ?? 0;
+
+            if ($baseSalary <= 0) {
+                throw new \Exception("Invalid base salary: " . $baseSalary);
+            }
+
+            // Calculate additional allowances from allowance table
+            $additionalAllowances = $this->calculateAllowances($employee);
+            $totalAdditionalAllowances = array_sum(array_column($additionalAllowances, 'amount'));
+            
+            // Total allowances = current allowances + additional allowances
+            $totalAllowances = $currentAllowances + $totalAdditionalAllowances;
+            $grossSalary = $baseSalary + $totalAllowances;
+
+            Log::info("Recalculation - Base: {$baseSalary}, Allowances: {$totalAllowances}, Gross: {$grossSalary}");
+
+            if ($grossSalary <= 0) {
+                throw new \Exception("Invalid gross salary: " . $grossSalary);
+            }
+
+            // Use rates from settings
+            $settings = $this->getSettings();
+            $nssfRate = $settings['nssf_employee_rate'] ?? 10.0;
+            $nhifRate = $settings['nhif_employee_rate'] ?? 3.0;
+
+            Log::info("Using rates for recalculation - NSSF: {$nssfRate}%, NHIF: {$nhifRate}%");
+
+            // Recalculate ALL deductions based on new gross salary
+            $deductions = $this->calculateDeductions($employee, $grossSalary, $nssfRate, $nhifRate);
+            $totalCalculatedDeductions = array_sum(array_column($deductions, 'amount'));
+            
+            // Total deductions = current deductions + calculated deductions
+            $totalDeductions = $currentDeductions + $totalCalculatedDeductions;
+            $netSalary = $grossSalary - $totalDeductions;
+
+            Log::info("Recalculation - Deductions: {$totalDeductions}, Net Salary: {$netSalary}");
+
+            // Recalculate employer contributions
+            $employerContributions = $this->calculateEmployerContributions($grossSalary, $nssfRate, $nhifRate);
+            $totalEmployerContributions = array_sum(array_column($employerContributions, 'amount'));
+
+            $recalculatedData = [
+                'base_salary' => $baseSalary,
+                'allowances' => $totalAllowances,
+                'total_amount' => $grossSalary,
+                'deductions' => $totalDeductions,
+                'net_salary' => $netSalary,
+                'employer_contributions' => $totalEmployerContributions,
+            ];
+
+            Log::info("Payroll recalculation completed successfully", [
+                'payroll_id' => $payroll->payroll_id,
+                'recalculated_data' => $recalculatedData
+            ]);
+
+            return $recalculatedData;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to recalculate payroll: ' . $e->getMessage(), [
+                'payroll_id' => $payroll->payroll_id,
+                'employee_id' => $employee->employee_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get formatted change details for alert message
+     */
+    private function getChangeDetails($changes)
+    {
+        $details = [];
+        
+        foreach ($changes as $field => $values) {
+            if ($values['old'] != $values['new']) {
+                $fieldName = str_replace('_', ' ', ucfirst($field));
+                $details[] = "{$fieldName}: TZS " . number_format($values['old'], 0) . 
+                            " → TZS " . number_format($values['new'], 0);
+            }
+        }
+        
+        return implode('; ', $details);
+    }
+
+    /**
+     * Apply retroactive adjustment to employee record
+     */
+    private function applyRetroactiveAdjustment($employee, $adjustmentType, $adjustmentAmount)
+    {
+        $currentAllowances = $employee->allowances ?? 0;
+        $currentBaseSalary = $employee->base_salary ?? 0;
+        $currentDeductions = $employee->deductions ?? 0;
+
+        switch ($adjustmentType) {
+            case 'salary_adjustment':
+                // Add to base salary
+                $employee->update([
+                    'base_salary' => $currentBaseSalary + $adjustmentAmount
+                ]);
+                break;
+
+            case 'allowance':
+                // Add to allowances
+                $employee->update([
+                    'allowances' => $currentAllowances + $adjustmentAmount
+                ]);
+                break;
+
+            case 'deduction':
+                // Add to deductions
+                $employee->update([
+                    'deductions' => $currentDeductions + $adjustmentAmount
+                ]);
+                break;
+        }
+
+        // Reload the employee to get updated values
+        $employee->refresh();
+
+        Log::info("Applied retroactive adjustment to employee", [
+            'employee_id' => $employee->employee_id,
+            'adjustment_type' => $adjustmentType,
+            'amount' => $adjustmentAmount,
+            'old_base_salary' => $currentBaseSalary,
+            'new_base_salary' => $employee->base_salary,
+            'old_allowances' => $currentAllowances,
+            'new_allowances' => $employee->allowances,
+            'old_deductions' => $currentDeductions,
+            'new_deductions' => $employee->deductions
+        ]);
+    }
+
+    /**
+     * Revert a specific payroll or payrolls for a period - Admin and HR only
+     */
+public function revert(Request $request)
+{
+    $user = Auth::user();
+    if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+        return redirect()->back()->with('error', 'Unauthorized. Only Admin and HR can revert payroll.');
+    }
+
+    $validator = Validator::make($request->all(), [
+        'period' => 'nullable|date_format:Y-m',
+        'payroll_id' => 'nullable|string',
+    ]);
+
+    if ($validator->fails()) {
+        return redirect()->back()
+            ->withErrors($validator)
+            ->withInput();
     }
 
     try {
         DB::beginTransaction();
 
-        $revertTypes = $request->input('revert_types', []);
-        $period = $request->input('period');
-        $employeeId = $request->input('employee_id');
+        if ($request->has('period') && !empty($request->period)) {
+            $period = $request->period;
+            $payrolls = Payroll::where('period', $period)->get();
 
-        $queryConditions = [];
-        if ($period) {
-            $queryConditions[] = ['period', '=', $period];
-        }
-        if ($employeeId) {
-            $queryConditions[] = ['employee_id', '=', $employeeId];
-        }
+            if ($payrolls->isEmpty()) {
+                return redirect()->back()
+                    ->with('error', 'No payroll records found for the specified period.')
+                    ->withInput();
+            }
 
-        $revertedCount = 0;
+            $revertedCount = 0;
 
-        // Revert Payroll Records
-        if (in_array('payroll', $revertTypes)) {
-            $payrollQuery = Payroll::where($queryConditions);
-            $payrollCount = $payrollQuery->count();
-            
-            // Delete related records for each payroll first
-            $payrolls = $payrollQuery->get();
             foreach ($payrolls as $payroll) {
                 $this->deleteRelatedRecords($payroll);
+                $payroll->delete();
+
+                $alertId = $this->generateRandomId('ALRT');
+                PayrollAlert::create([
+                    'alert_id' => $alertId,
+                    'employee_id' => $payroll->employee_id,
+                    'type' => 'Payroll Reverted',
+                    'message' => "Payroll {$payroll->payroll_id} for {$payroll->employee_name} in period {$period} has been reverted.",
+                    'status' => 'Read'
+                ]);
+
+                $revertedCount++;
             }
-            
-            $payrollQuery->delete();
-            $revertedCount += $payrollCount;
-            
-            Log::info('Reverted payroll records', [
-                'count' => $payrollCount,
-                'period' => $period,
-                'employee_id' => $employeeId,
-                'user_id' => $user->id
+
+            DB::commit();
+            // NOTIFICATION: Payroll imezimwa
+            return redirect()->route('payroll')
+                ->with('success', "Successfully reverted {$revertedCount} payroll record(s) for period {$period}.");
+        }
+
+        if ($request->has('payroll_id') && !empty($request->payroll_id)) {
+            $payrollId = $request->payroll_id;
+
+            $payroll = Payroll::whereRaw('LOWER(payroll_id) = ?', [strtolower($payrollId)])->first();
+            if (!$payroll) {
+                return redirect()->back()
+                    ->with('error', 'Payroll record not found for the specified ID.')
+                    ->withInput();
+            }
+
+            $this->deleteRelatedRecords($payroll);
+            $payroll->delete();
+
+            $alertId = $this->generateRandomId('ALRT');
+            PayrollAlert::create([
+                'alert_id' => $alertId,
+                'employee_id' => $payroll->employee_id,
+                'type' => 'Payroll Reverted',
+                'message' => "Payroll {$payrollId} for {$payroll->employee_name} has been reverted.",
+                'status' => 'Read'
             ]);
+
+            DB::commit();
+            // NOTIFICATION: Payroll imezimwa
+            return redirect()->route('payroll')
+                ->with('success', "Payroll record {$payrollId} has been reverted successfully.");
         }
 
-        // Revert Transactions
-        if (in_array('transactions', $revertTypes)) {
-            $transactionConditions = [];
-            if ($employeeId) {
-                $transactionConditions[] = ['employee_id', '=', $employeeId];
-            }
-            if ($period) {
-                $startDate = Carbon::parse($period)->startOfMonth();
-                $endDate = Carbon::parse($period)->endOfMonth();
-                $transactionQuery = Transaction::where($transactionConditions)
-                    ->whereBetween('transaction_date', [$startDate, $endDate]);
-            } else {
-                $transactionQuery = Transaction::where($transactionConditions);
-            }
-            
-            $transactionCount = $transactionQuery->count();
-            $transactionQuery->delete();
-            $revertedCount += $transactionCount;
-            
-            Log::info('Reverted transactions', [
-                'count' => $transactionCount,
-                'period' => $period,
-                'employee_id' => $employeeId,
-                'user_id' => $user->id
-            ]);
-        }
-
-        // Revert Alerts
-        if (in_array('alerts', $revertTypes)) {
-            $alertConditions = [];
-            if ($employeeId) {
-                $alertConditions[] = ['employee_id', '=', $employeeId];
-            }
-            if ($period) {
-                $startDate = Carbon::parse($period)->startOfMonth();
-                $endDate = Carbon::parse($period)->endOfMonth();
-                $alertQuery = PayrollAlert::where($alertConditions)
-                    ->whereBetween('created_at', [$startDate, $endDate]);
-            } else {
-                $alertQuery = PayrollAlert::where($alertConditions);
-            }
-            
-            $alertCount = $alertQuery->count();
-            $alertQuery->delete();
-            $revertedCount += $alertCount;
-            
-            Log::info('Reverted alerts', [
-                'count' => $alertCount,
-                'period' => $period,
-                'employee_id' => $employeeId,
-                'user_id' => $user->id
-            ]);
-        }
-
-        // Revert Retroactive Payments (this would depend on your RetroactivePay model if it exists)
-        if (in_array('retroactive', $revertTypes)) {
-            // If you have a RetroactivePay model, uncomment and adjust this section
-            /*
-            $retroConditions = [];
-            if ($employeeId) {
-                $retroConditions[] = ['employee_id', '=', $employeeId];
-            }
-            if ($period) {
-                $retroConditions[] = ['period', '=', $period];
-            }
-            
-            $retroQuery = RetroactivePay::where($retroConditions);
-            $retroCount = $retroQuery->count();
-            $retroQuery->delete();
-            $revertedCount += $retroCount;
-            */
-            
-            // For now, we'll just log that retroactive was selected but not implemented
-            Log::info('Retroactive revert selected but not implemented', [
-                'period' => $period,
-                'employee_id' => $employeeId,
-                'user_id' => $user->id
-            ]);
-        }
-
-        DB::commit();
-
-        $message = "Successfully reverted {$revertedCount} records.";
-        if ($period) {
-            $message .= " Period: " . Carbon::parse($period)->format('F Y');
-        }
-        if ($employeeId) {
-            $employee = Employee::find($employeeId);
-            $message .= $employee ? " Employee: " . $employee->name : "";
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => $message
-        ]);
+        return redirect()->back()
+            ->with('error', 'Either period or payroll ID is required.')
+            ->withInput();
 
     } catch (\Exception $e) {
         DB::rollBack();
-        Log::error('Revert all data failed: ' . $e->getMessage(), [
+        Log::error('Payroll revert failed: ' . $e->getMessage(), [
             'user_id' => $user->id,
-            'revert_types' => $revertTypes,
-            'period' => $period,
-            'employee_id' => $employeeId,
+            'payroll_id' => $request->payroll_id ?? 'N/A',
+            'period' => $request->period ?? 'N/A',
             'trace' => $e->getTraceAsString()
         ]);
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to revert data: ' . $e->getMessage()
-        ], 500);
+        // NOTIFICATION: Kuzima kumeshindwa
+        return redirect()->back()
+            ->with('error', 'Failed to revert payroll: ' . $e->getMessage())
+            ->withInput();
     }
 }
+
+    /**
+     * Revert retroactive adjustments
+     */
+    public function revertRetroactive(Request $request)
+    {
+        $user = Auth::user();
+        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            return redirect()->back()->with('error', 'Unauthorized. Only Admin and HR can revert retroactive adjustments.');
+        }
+
+        // FIXED: Validation rule for employee_id
+        $validator = Validator::make($request->all(), [
+            'period' => 'required|date_format:Y-m',
+            'employee_id' => 'nullable',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $period = $request->period;
+            $employeeId = $request->employee_id;
+
+            $query = RetroactiveAdjustment::where('period', $period);
+
+            if ($employeeId) {
+                // Find employee by employee_id to get internal ID
+                $employee = Employee::where('employee_id', $employeeId)->first();
+                if ($employee) {
+                    $query->where('employee_id', $employee->id);
+                }
+            }
+
+            $adjustments = $query->get();
+            $revertedCount = 0;
+
+            foreach ($adjustments as $adjustment) {
+                $adjustment->update(['status' => 'reverted']);
+                $revertedCount++;
+            }
+
+            DB::commit();
+
+            $message = "Successfully reverted {$revertedCount} retroactive adjustment(s) for period " . Carbon::parse($period)->format('F Y');
+
+            if ($employeeId) {
+                $employee = Employee::where('employee_id', $employeeId)->first();
+                $message .= " for employee: " . ($employee->name ?? '');
+            }
+
+            return redirect()->route('payroll')
+                ->with('success', $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Revert retroactive adjustments failed: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'period' => $request->period,
+                'employee_id' => $request->employee_id,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return redirect()->back()
+                ->with('error', 'Failed to revert retroactive adjustments: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    /**
+     * Revert all specified data - Admin and HR only - FIXED VALIDATION RULES
+     */
+    public function revertAll(Request $request)
+    {
+        $user = Auth::user();
+        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+            return redirect()->back()->with('error', 'Unauthorized. Only Admin and HR can revert all data.');
+        }
+
+        // FIXED: Validation rules for employee_id
+        $validator = Validator::make($request->all(), [
+            'revert_types' => 'required|array',
+            'revert_types.*' => 'in:payroll,transactions,alerts,retroactive',
+            'period' => 'nullable|date_format:Y-m',
+            'employee_id' => 'nullable',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $revertTypes = $request->input('revert_types', []);
+            $period = $request->input('period');
+            $employeeId = $request->input('employee_id');
+
+            $queryConditions = [];
+            if ($period) {
+                $queryConditions[] = ['period', '=', $period];
+            }
+            if ($employeeId) {
+                $queryConditions[] = ['employee_id', '=', $employeeId];
+            }
+
+            $revertedCount = 0;
+
+            if (in_array('payroll', $revertTypes)) {
+                $payrollQuery = Payroll::where($queryConditions);
+                $payrollCount = $payrollQuery->count();
+
+                $payrolls = $payrollQuery->get();
+                foreach ($payrolls as $payroll) {
+                    $this->deleteRelatedRecords($payroll);
+                }
+
+                $payrollQuery->delete();
+                $revertedCount += $payrollCount;
+            }
+
+            if (in_array('transactions', $revertTypes)) {
+                $transactionConditions = [];
+                if ($employeeId) {
+                    $transactionConditions[] = ['employee_id', '=', $employeeId];
+                }
+                if ($period) {
+                    $startDate = Carbon::parse($period)->startOfMonth();
+                    $endDate = Carbon::parse($period)->endOfMonth();
+                    $transactionQuery = Transaction::where($transactionConditions)
+                        ->whereBetween('transaction_date', [$startDate, $endDate]);
+                } else {
+                    $transactionQuery = Transaction::where($transactionConditions);
+                }
+
+                $transactionCount = $transactionQuery->count();
+                $transactionQuery->delete();
+                $revertedCount += $transactionCount;
+            }
+
+            if (in_array('alerts', $revertTypes)) {
+                $alertConditions = [];
+                if ($employeeId) {
+                    $alertConditions[] = ['employee_id', '=', $employeeId];
+                }
+                if ($period) {
+                    $startDate = Carbon::parse($period)->startOfMonth();
+                    $endDate = Carbon::parse($period)->endOfMonth();
+                    $alertQuery = PayrollAlert::where($alertConditions)
+                        ->whereBetween('created_at', [$startDate, $endDate]);
+                } else {
+                    $alertQuery = PayrollAlert::where($alertConditions);
+                }
+
+                $alertCount = $alertQuery->count();
+                $alertQuery->delete();
+                $revertedCount += $alertCount;
+            }
+
+            if (in_array('retroactive', $revertTypes)) {
+                $retroConditions = [];
+                if ($employeeId) {
+                    // Find employee by employee_id to get internal ID
+                    $employee = Employee::where('employee_id', $employeeId)->first();
+                    if ($employee) {
+                        $retroConditions[] = ['employee_id', '=', $employee->id];
+                    }
+                }
+                if ($period) {
+                    $retroQuery = RetroactiveAdjustment::where($retroConditions)
+                        ->where('period', $period);
+                } else {
+                    $retroQuery = RetroactiveAdjustment::where($retroConditions);
+                }
+
+                $retroCount = $retroQuery->count();
+                $retroQuery->delete();
+                $revertedCount += $retroCount;
+            }
+
+            DB::commit();
+
+            $message = "Successfully reverted {$revertedCount} records.";
+            if ($period) {
+                $message .= " Period: " . Carbon::parse($period)->format('F Y');
+            }
+            if ($employeeId) {
+                $employee = Employee::where('employee_id', $employeeId)->first();
+                $message .= $employee ? " Employee: " . $employee->name : "";
+            }
+
+            return redirect()->route('payroll')
+                ->with('success', $message);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Revert all data failed: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'revert_types' => $revertTypes,
+                'period' => $period,
+                'employee_id' => $employeeId,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return redirect()->back()
+                ->with('error', 'Failed to revert data: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
 
     /**
      * Helper method to delete related records for a payroll
      */
     private function deleteRelatedRecords($payroll)
     {
-        // Delete related payslips
         Payslip::where('employee_id', $payroll->employee_id)
             ->where('period', $payroll->period)
             ->delete();
 
-        // Delete related transactions
         $descriptionPeriod = Carbon::parse($payroll->period)->format('F Y');
         Transaction::where('employee_id', $payroll->employee_id)
             ->where('transaction_date', '>=', Carbon::parse($payroll->period)->startOfMonth())
@@ -814,127 +1404,31 @@ class PayrollController extends Controller
             ->where('description', 'like', '%' . $descriptionPeriod . '%')
             ->delete();
 
-        // Delete related alerts (except revert alerts)
+        // Always delete alerts related to this payroll
         PayrollAlert::where('employee_id', $payroll->employee_id)
             ->where('created_at', '>=', Carbon::parse($payroll->period)->startOfMonth())
             ->where('created_at', '<', Carbon::parse($payroll->period)->endOfMonth()->addDay())
-            ->where('message', 'like', '%' . $descriptionPeriod . '%')
-            ->where('type', 'not like', '%Revert%')
+            ->where('message', 'like', '%' . $payroll->payroll_id . '%')
             ->delete();
     }
 
     /**
-     * Export payroll to PDF
-     */
-    public function exportPDF(Request $request)
-    {
-        $user = Auth::user();
-        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access.'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'period' => 'required|date_format:Y-m',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => implode(', ', $validator->errors()->all())
-            ], 422);
-        }
-
-        $payrolls = Payroll::with('employee')
-            ->where('period', $request->period)
-            ->get();
-
-        if ($payrolls->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No payroll records found for the specified period.'
-            ], 404);
-        }
-
-        $pdf = Pdf::loadView('payroll.pdf', compact('payrolls'));
-        return $pdf->download('payroll-' . $request->period . '.pdf');
-    }
-
-    /**
-     * Export payroll to Excel
-     */
-    public function exportExcel(Request $request)
-    {
-        $user = Auth::user();
-        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access.'
-            ], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'period' => 'required|date_format:Y-m',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => implode(', ', $validator->errors()->all())
-            ], 422);
-        }
-
-        $payrolls = Payroll::with('employee')
-            ->where('period', $request->period)
-            ->get();
-
-        if ($payrolls->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No payroll records found for the specified period.'
-            ], 404);
-        }
-
-        return Excel::download(new class($payrolls) implements \Maatwebsite\Excel\Concerns\FromCollection {
-            private $payrolls;
-
-            public function __construct($payrolls)
-            {
-                $this->payrolls = $payrolls;
-            }
-
-            public function collection()
-            {
-                return $this->payrolls->map(function ($payroll) {
-                    return [
-                        'Payroll ID' => $payroll->payroll_id,
-                        'Employee' => $payroll->employee_name,
-                        'Period' => $payroll->period,
-                        'Base Salary' => $payroll->base_salary,
-                        'Allowances' => $payroll->allowances,
-                        'Deductions' => $payroll->deductions,
-                        'Net Salary' => $payroll->net_salary,
-                        'Status' => $payroll->status,
-                    ];
-                });
-            }
-        }, 'payroll-' . $request->period . '.xlsx');
-    }
-
-    /**
-     * Calculate allowances for an employee
+     * Calculate allowances for employee
      */
     private function calculateAllowances($employee)
     {
-        $allowances = Allowance::where('active', 1)->get();
+        $allowances = Allowance::join('employee_allowance', 'allowance.id', '=', 'employee_allowance.allowance_id')
+            ->where('employee_allowance.employee_id', $employee->employee_id)
+            ->where('allowance.active', 1)
+            ->whereNull('allowance.deleted_at')
+            ->get(['allowance.*']);
+
         $result = [];
 
         foreach ($allowances as $allowance) {
             $amount = $allowance->type === 'percentage'
-                ? ($employee->base_salary * ($allowance->amount / 100))
-                : $allowance->amount;
+                ? round($employee->base_salary * ($allowance->amount / 100), 0)
+                : round($allowance->amount, 0);
 
             $result[] = [
                 'name' => $allowance->name,
@@ -947,30 +1441,49 @@ class PayrollController extends Controller
     }
 
     /**
-     * Calculate deductions based on Tanzanian regulations
+     * Calculate deductions with dynamic rates
      */
-    private function calculateDeductions($employee, $grossSalary, $nssfRate = null, $nhifRate = null)
+    private function calculateDeductions($employee, $grossSalary, $nssfRate, $nhifRate)
     {
-        $settings = $this->getSettings();
-        $deductions = Deduction::where('active', 1)->get();
+        if ($grossSalary <= 0) {
+            throw new \Exception("Invalid gross salary for employee ID {$employee->employee_id}");
+        }
+
         $result = [];
 
-        $nssfRate = $nssfRate ?? ($settings['nssf_employee_rate'] ?? 10.0);
-        $nssf = $grossSalary * ($nssfRate / 100);
+        // NSSF: Dynamic rate from form (employee share)
+        $nssf = round($grossSalary * ($nssfRate / 100), 0);
         $result[] = ['name' => 'NSSF', 'amount' => $nssf, 'category' => 'statutory'];
 
-        $nhifRate = $nhifRate ?? $this->getNHIFRate($grossSalary);
-        $nhif = $grossSalary * ($nhifRate / 100);
+        // NHIF: Dynamic rate from form (employee share)
+        $nhif = round($grossSalary * ($nhifRate / 100), 0);
         $result[] = ['name' => 'NHIF', 'amount' => $nhif, 'category' => 'statutory'];
 
-        $taxableIncome = $grossSalary - $nssf;
-        $paye = $this->calculatePAYE($taxableIncome);
+        // Calculate taxable income
+        $allowances = $this->calculateAllowances($employee);
+        $taxableAllowances = array_sum(
+            array_map(
+                fn($allowance) => $allowance['taxable'] ? $allowance['amount'] : 0,
+                $allowances
+            )
+        );
+        $taxableIncome = $employee->base_salary + $taxableAllowances - $nssf;
+
+        // PAYE
+        $paye = round($this->calculatePAYE($taxableIncome), 0);
         $result[] = ['name' => 'PAYE', 'amount' => $paye, 'category' => 'statutory'];
+
+        // Other deductions per employee
+        $deductions = Deduction::join('employee_deduction', 'deductions.id', '=', 'employee_deduction.deduction_id')
+            ->where('employee_deduction.employee_id', $employee->employee_id)
+            ->where('deductions.active', 1)
+            ->whereNull('deductions.deleted_at')
+            ->get(['deductions.*']);
 
         foreach ($deductions as $deduction) {
             $amount = $deduction->type === 'percentage'
-                ? ($grossSalary * ($deduction->amount / 100))
-                : $deduction->amount;
+                ? round($employee->base_salary * ($deduction->amount / 100), 0)
+                : round($deduction->amount, 0);
 
             $result[] = [
                 'name' => $deduction->name,
@@ -983,12 +1496,29 @@ class PayrollController extends Controller
     }
 
     /**
-     * Calculate NHIF rate based on gross salary
+     * Calculate employer contributions (WCF, SDL, employer NSSF, employer NHIF)
      */
-    private function getNHIFRate($grossSalary)
+    private function calculateEmployerContributions($grossSalary, $nssfRate, $nhifRate)
     {
-        // Flat 3% employee rate as per 2025 regulations (total 6%, shared with employer)
-        return 3.0;
+        $result = [];
+
+        // Employer NSSF (matching employee share)
+        $employerNssf = round($grossSalary * ($nssfRate / 100), 0);
+        $result[] = ['name' => 'NSSF Employer', 'amount' => $employerNssf, 'category' => 'employer'];
+
+        // Employer NHIF (matching employee share)
+        $employerNhif = round($grossSalary * ($nhifRate / 100), 0);
+        $result[] = ['name' => 'NHIF Employer', 'amount' => $employerNhif, 'category' => 'employer'];
+
+        // WCF: 0.5% employer contribution
+        $wcf = round($grossSalary * 0.005, 0);
+        $result[] = ['name' => 'WCF', 'amount' => $wcf, 'category' => 'employer'];
+
+        // SDL: 3.5% employer contribution
+        $sdl = round($grossSalary * 0.035, 0);
+        $result[] = ['name' => 'SDL', 'amount' => $sdl, 'category' => 'employer'];
+
+        return $result;
     }
 
     /**
@@ -999,31 +1529,29 @@ class PayrollController extends Controller
         $settings = $this->getSettings();
         $taxFreeThreshold = $settings['paye_tax_free'] ?? 270000;
 
-        // 2025 Tanzanian tax brackets (TZS, monthly) - confirmed no changes from previous years
         if ($taxableIncome <= $taxFreeThreshold) {
             return 0;
         } elseif ($taxableIncome <= 520000) {
-            return ($taxableIncome - $taxFreeThreshold) * 0.09;
+            return ($taxableIncome - $taxFreeThreshold) * 0.08;
         } elseif ($taxableIncome <= 760000) {
-            return 22500 + ($taxableIncome - 520000) * 0.20;
+            return 20000 + ($taxableIncome - 520000) * 0.20;
         } elseif ($taxableIncome <= 1000000) {
-            return 70500 + ($taxableIncome - 760000) * 0.25;
+            return 68000 + ($taxableIncome - 760000) * 0.25;
         } else {
-            return 130500 + ($taxableIncome - 1000000) * 0.30;
+            return 128000 + ($taxableIncome - 1000000) * 0.30;
         }
     }
 
     /**
-     * Retrieve global settings (Mock implementation)
+     * Retrieve global settings
      */
     private function getSettings()
     {
-        // In a real application, this would fetch from a database table like 'settings'
         return Setting::pluck('value', 'key')->toArray();
     }
 
     /**
-     * Generate random ID with prefix (more collision-resistant)
+     * Generate random ID with prefix
      */
     private function generateRandomId($prefix)
     {
@@ -1031,28 +1559,24 @@ class PayrollController extends Controller
         $attempt = 0;
 
         while ($attempt < $maxAttempts) {
-            // Generate random string (8 characters) using more entropy
-            $random = strtoupper(bin2hex(random_bytes(4))); // 8 characters
+            $random = strtoupper(bin2hex(random_bytes(4)));
             $newId = $prefix . '-' . $random;
 
-            // Check if ID is unique across all relevant tables
             $isUnique = !Payroll::where('payroll_id', $newId)->exists() &&
-                       !Transaction::where('transaction_id', $newId)->exists() &&
-                       !PayrollAlert::where('alert_id', $newId)->exists() &&
-                       !Payslip::where('payslip_id', $newId)->exists();
+                        !Transaction::where('transaction_id', $newId)->exists() &&
+                        !PayrollAlert::where('alert_id', $newId)->exists() &&
+                        !Payslip::where('payslip_id', $newId)->exists() &&
+                        !RetroactiveAdjustment::where('adjustment_id', $newId)->exists();
 
             if ($isUnique) {
                 return $newId;
             }
 
             $attempt++;
-            Log::warning("Random ID collision detected for {$newId}, attempt {$attempt}");
         }
 
-        // Fallback: use timestamp-based ID if random generation fails
         $timestamp = now()->format('YmdHis');
         $fallbackId = $prefix . '-' . $timestamp . '-' . rand(1000, 9999);
-        Log::warning("Using fallback ID generation: {$fallbackId}");
         return $fallbackId;
     }
 }

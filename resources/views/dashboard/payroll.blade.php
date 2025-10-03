@@ -21,15 +21,47 @@
             <span class="block sm:inline">Unauthorized access. This page is restricted to Admin and HR roles only.</span>
         </div>
     @else
-        <!-- Success/Error Message -->
+        <!-- Success/Error/Warning Messages -->
         @if(session('success'))
             <div class="bg-green-50 border-l-4 border-green-400 text-green-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
-                <span class="block sm:inline">{{ session('success') }}</span>
+                <div class="flex items-center">
+                    <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                    <span class="block sm:inline">{{ session('success') }}</span>
+                </div>
             </div>
         @endif
+
         @if(session('error'))
             <div class="bg-red-50 border-l-4 border-red-400 text-red-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
-                <span class="block sm:inline">{{ session('error') }}</span>
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+                    <span class="block sm:inline">{{ session('error') }}</span>
+                </div>
+            </div>
+        @endif
+
+        @if(session('warning'))
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 mr-3"></i>
+                    <span class="block sm:inline">{{ session('warning') }}</span>
+                </div>
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="bg-red-50 border-l-4 border-red-400 text-red-700 p-4 rounded-lg mb-6 shadow-sm" role="alert">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+                    <div>
+                        <span class="block font-medium">Please fix the following errors:</span>
+                        <ul class="mt-1 list-disc list-inside text-sm">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
             </div>
         @endif
 
@@ -179,8 +211,8 @@
                                             </div>
                                             <div>
                                                 <div class="font-medium text-gray-900">{{ $payroll->employee_name }}</div>
-                                                <div class="text-sm text-gray-500">{{ $payroll->employee->department ?? 'N/A' }} • {{ $payroll->employee->employee_id ?? 'N/A' }}</div>
-                                                <div class="text-xs text-gray-400">{{ $payroll->employee->position ?? 'N/A' }}</div>
+                                                <div class="text-sm text-gray-500"> {{ $payroll->employee_id ?? 'N/A' }}</div>
+                                                <div class="text-xs text-gray-400">{{ $payroll->position ?? 'N/A' }}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -342,7 +374,7 @@
                                         'salary_payment' => 'text-blue-600 bg-blue-50',
                                         'bonus' => 'text-green-600 bg-green-50',
                                         'deduction' => 'text-red-600 bg-red-50',
-                                        'adjustment' => 'text-purple-600 bg-purple-50'
+                                        'adjustment' => 'text-yellow-600 bg-yellow-50'
                                     ];
                                     $typeColor = $typeColors[strtolower($transaction->type)] ?? 'text-gray-600 bg-gray-50';
                                 @endphp
@@ -355,8 +387,8 @@
                                             </div>
                                             <div>
                                                 <div class="font-medium text-gray-900">{{ $transaction->employee_name }}</div>
-                                                <div class="text-sm text-gray-500">{{ $transaction->employee->department ?? 'N/A' }} • {{ $transaction->employee->employee_id ?? 'N/A' }}</div>
-                                                <div class="text-xs text-gray-400">{{ $transaction->employee->position ?? 'N/A' }}</div>
+                                                <div class="text-sm text-gray-500">{{ $transaction->department ?? 'N/A' }} | {{ $transaction->employee_id ?? 'N/A' }}</div>
+                                                <div class="text-xs text-gray-400">{{ $transaction->position ?? 'N/A' }}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -512,7 +544,7 @@
                                         'high_deductions' => 'text-red-600 bg-red-50',
                                         'retroactive_adjustment' => 'text-blue-600 bg-blue-50',
                                         'payroll_reverted' => 'text-orange-600 bg-orange-50',
-                                        'system_alert' => 'text-purple-600 bg-purple-50'
+                                        'system_alert' => 'text-yellow-600 bg-yellow-50'
                                     ];
                                     $typeColor = $typeColors[strtolower(str_replace(' ', '_', $alert->type))] ?? 'text-gray-600 bg-gray-50';
                                 @endphp
@@ -525,8 +557,8 @@
                                             </div>
                                             <div>
                                                 <div class="font-medium text-gray-900">{{ $alert->employee_name }}</div>
-                                                <div class="text-sm text-gray-500">{{ $alert->employee->department ?? 'N/A' }} • {{ $alert->employee->employee_id ?? 'N/A' }}</div>
-                                                <div class="text-xs text-gray-400">{{ $alert->employee->position ?? 'N/A' }}</div>
+                                                <div class="text-sm text-gray-500">{{ $alert->department ?? 'N/A' }} | {{ $alert->employee_id ?? 'N/A' }}</div>
+                                                <div class="text-xs text-gray-400">{{ $alert->position ?? 'N/A' }}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -671,29 +703,30 @@
                         </div>
                         <div>
                             <label for="employee_selection" class="block text-gray-600 text-sm font-medium mb-1">Employee Selection</label>
-                            <select id="employee_selection" name="employee_selection" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required>
+                            <select id="employee_selection" name="employee_selection" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required onchange="toggleEmployeeSelection()">
                                 <option value="all">All Active Employees</option>
                                 <option value="single">Single Employee</option>
                                 <option value="multiple">Multiple Employees</option>
                             </select>
                         </div>
                         <div id="employee_id_single" class="hidden">
-                            <label for="employee_id_select" class="block text-gray-600 text-sm font-medium mb-1">Select Employee</label>
-                            <select id="employee_id_select" name="employee_id" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                                @foreach($employees->where('status', 'active') as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div id="employee_id_multiple" class="hidden">
-                            <label for="employee_ids_select" class="block text-gray-600 text-sm font-medium mb-1">Select Employees</label>
-                            <select id="employee_ids_select" name="employee_ids[]" multiple class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" size="4">
-                                @foreach($employees->where('status', 'active') as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
-                                @endforeach
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple employees</p>
-                        </div>
+                        <label for="employee_id_select" class="block text-gray-600 text-sm font-medium mb-1">Select Employee</label>
+                        <select id="employee_id_select" name="employee_id" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
+                            <option value="">Select an employee</option>
+                            @foreach($employees->where('status', 'active') as $employee)
+                                <option value="{{ $employee->employee_id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div id="employee_id_multiple" class="hidden">
+                        <label for="employee_ids_select" class="block text-gray-600 text-sm font-medium mb-1">Select Employees</label>
+                        <select id="employee_ids_select" name="employee_ids[]" multiple class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" size="6">
+                            @foreach($employees->where('status', 'active') as $employee)
+                                <option value="{{ $employee->employee_id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
+                            @endforeach
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple employees</p>
+                    </div>
                         <div>
                             <label for="nssf_rate" class="block text-gray-600 text-sm font-medium mb-1">NSSF Rate (%)</label>
                             <input type="number" id="nssf_rate" name="nssf_rate" step="0.1" value="{{ $settings['nssf_employee_rate'] ?? 10.0 }}" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required>
@@ -745,38 +778,39 @@
                         </div>
                         <div>
                             <label for="retro_employee_selection" class="block text-gray-600 text-sm font-medium mb-1">Employee Selection</label>
-                            <select id="retro_employee_selection" name="employee_selection" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required>
+                            <select id="retro_employee_selection" name="employee_selection" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required onchange="toggleRetroEmployeeSelection()">
                                 <option value="all">All Employees with Payroll</option>
                                 <option value="single">Single Employee</option>
                                 <option value="multiple">Multiple Employees</option>
                             </select>
                         </div>
-                        <div id="retro_employee_single" class="hidden">
-                            <label for="retro_employee_id" class="block text-gray-600 text-sm font-medium mb-1">Select Employee</label>
-                            <select id="retro_employee_id" name="employee_id" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
-                                @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div id="retro_employee_multiple" class="hidden">
-                            <label for="retro_employee_ids" class="block text-gray-600 text-sm font-medium mb-1">Select Employees</label>
-                            <select id="retro_employee_ids" name="employee_ids[]" multiple class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" size="4">
-                                @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
-                                @endforeach
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple employees</p>
-                        </div>
-                        <div>
-                            <label for="adjustment_type" class="block text-gray-600 text-sm font-medium mb-1">Adjustment Type</label>
-                            <select id="adjustment_type" name="adjustment_type" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required>
-                                <option value="bonus">Bonus Payment</option>
-                                <option value="deduction">Deduction</option>
-                                <option value="salary_adjustment">Salary Adjustment</option>
-                                <option value="allowance">Allowance</option>
-                            </select>
-                        </div>
+<div id="retro_employee_single" class="hidden">
+    <label for="retro_employee_id" class="block text-gray-600 text-sm font-medium mb-1">Select Employee</label>
+    <select id="retro_employee_id" name="employee_id" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200">
+        <option value="">Select an employee</option>
+        @foreach($employees as $employee)
+            <option value="{{ $employee->employee_id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
+        @endforeach
+    </select>
+</div>
+<div id="retro_employee_multiple" class="hidden">
+    <label for="retro_employee_ids" class="block text-gray-600 text-sm font-medium mb-1">Select Employees</label>
+    <select id="retro_employee_ids" name="employee_ids[]" multiple class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" size="6">
+        @foreach($employees as $employee)
+            <option value="{{ $employee->employee_id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
+        @endforeach
+    </select>
+    <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple employees</p>
+</div>
+<div>
+    <label for="adjustment_type" class="block text-gray-600 text-sm font-medium mb-1">Adjustment Type</label>
+    <select id="adjustment_type" name="adjustment_type" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required>
+        <option value="">Select adjustment type</option>
+        <option value="salary_adjustment">Salary Adjustment</option>
+        <option value="allowance">Allowance</option>
+        <option value="deduction">Deduction</option>
+    </select>
+</div>
                         <div>
                             <label for="adjustment_amount" class="block text-gray-600 text-sm font-medium mb-1">Adjustment Amount (TZS)</label>
                             <input type="number" id="adjustment_amount" name="adjustment_amount" step="0.01" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full p-2.5 transition-all duration-200" required>
@@ -919,15 +953,15 @@
                             </select>
                         </div>
 
-                        <div>
-                            <label for="revert_employee_all" class="block text-gray-600 text-sm font-medium mb-1">Select Employee (Optional)</label>
-                            <select id="revert_employee_all" name="employee_id" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 block w-full p-2.5 transition-all duration-200">
-                                <option value="" selected>All Employees</option>
-                                @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
-                                @endforeach
-                            </select>
-                        </div>
+<div>
+    <label for="revert_employee_all" class="block text-gray-600 text-sm font-medium mb-1">Select Employee (Optional)</label>
+    <select id="revert_employee_all" name="employee_id" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 block w-full p-2.5 transition-all duration-200">
+        <option value="" selected>All Employees</option>
+        @foreach($employees as $employee)
+            <option value="{{ $employee->employee_id }}">{{ $employee->name }} ({{ $employee->department ?? 'N/A' }} - {{ $employee->employee_id ?? 'N/A' }})</option>
+        @endforeach
+    </select>
+</div>
                     </div>
 
                     <div class="flex justify-end space-x-3 mt-6">
@@ -1069,9 +1103,9 @@
         </div>
     </div>
 
-    <!-- Alert Details Modal -->
+    <!-- Alert Details Modal - IMPROVED DESIGN -->
     <div id="alertDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50" role="dialog" aria-labelledby="alertDetailsModalTitle" aria-modal="true">
-        <div class="bg-white rounded-xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content">
+        <div class="bg-white rounded-xl w-full max-w-2xl transform transition-all duration-300 scale-95 modal-content">
             <div class="p-6 bg-green-50 border-b border-green-200">
                 <div class="flex items-center justify-between">
                     <h3 class="text-xl font-semibold text-green-600 flex items-center" id="alertDetailsModalTitle">
@@ -1085,30 +1119,34 @@
                 </div>
             </div>
             <div class="p-6">
-                <div class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-gray-600 text-sm font-medium mb-1">Alert ID</label>
-                        <p id="alertDetailsId" class="text-gray-900"></p>
+                        <p id="alertDetailsId" class="text-gray-900 font-mono">-</p>
                     </div>
                     <div>
                         <label class="block text-gray-600 text-sm font-medium mb-1">Employee</label>
-                        <p id="alertDetailsEmployee" class="text-gray-900"></p>
+                        <p id="alertDetailsEmployee" class="text-gray-900">-</p>
                     </div>
                     <div>
                         <label class="block text-gray-600 text-sm font-medium mb-1">Type</label>
-                        <p id="alertDetailsType" class="text-gray-900"></p>
+                        <p id="alertDetailsType" class="text-gray-900">-</p>
                     </div>
                     <div>
-                        <label class="block text-gray-600 text-sm font-medium mb-1">Message</label>
-                        <p id="alertDetailsMessage" class="text-gray-900"></p>
+                        <label class="block text-gray-600 text-sm font-medium mb-1">Date</label>
+                        <p id="alertDetailsDate" class="text-gray-900">-</p>
                     </div>
                     <div>
                         <label class="block text-gray-600 text-sm font-medium mb-1">Status</label>
-                        <p id="alertDetailsStatus" class="text-gray-900"></p>
+                        <p id="alertDetailsStatus" class="text-gray-900">-</p>
                     </div>
                     <div>
-                        <label class="block text-gray-600 text-sm font-medium mb-1">Date Created</label>
-                        <p id="alertDetailsDate" class="text-gray-900"></p>
+                        <label class="block text-gray-600 text-sm font-medium mb-1">Department</label>
+                        <p id="alertDetailsDepartment" class="text-gray-900">-</p>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-gray-600 text-sm font-medium mb-1">Message</label>
+                        <p id="alertDetailsMessage" class="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-200">-</p>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
@@ -1182,208 +1220,493 @@
 
 <script>
     // Tab Management & Search
-document.addEventListener('DOMContentLoaded', function() {
-    
-    const tabs = {
-        payroll: { tab: document.getElementById('payrollTab'), container: document.getElementById('payrollContainer') },
-        transactions: { tab: document.getElementById('transactionsTab'), container: document.getElementById('transactionsContainer') },
-        alerts: { tab: document.getElementById('alertsTab'), container: document.getElementById('alertsContainer') }
-    };
-    
-    // Initialize tabs from URL parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const activeTab = urlParams.get('tab') || 'payroll';
-    switchTab(activeTab);
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM loaded - initializing tabs and modals');
 
-    // Tab click events
-    Object.keys(tabs).forEach(tabKey => {
-        tabs[tabKey].tab.addEventListener('click', () => switchTab(tabKey));
-    });
+        const tabs = {
+            payroll: { tab: document.getElementById('payrollTab'), container: document.getElementById('payrollContainer') },
+            transactions: { tab: document.getElementById('transactionsTab'), container: document.getElementById('transactionsContainer') },
+            alerts: { tab: document.getElementById('alertsTab'), container: document.getElementById('alertsContainer') }
+        };
 
-    // Search functionality
-    const searchElements = [
-        { inputId: 'searchPayroll', tableId: 'payrollTable' },
-        { inputId: 'searchTransaction', tableId: 'transactionTable' },
-        { inputId: 'searchAlerts', tableId: 'alertTable' }
-    ];
+        // Initialize tabs from URL parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTab = urlParams.get('tab') || 'payroll';
+        console.log('Active tab:', activeTab);
+        switchTab(activeTab);
 
-    searchElements.forEach(item => {
-        const input = document.getElementById(item.inputId);
-        if (input) {
-            input.addEventListener('input', function() {
-                filterTable(item.tableId, this.value.toLowerCase());
-            });
-        }
-    });
-
-    // Initialize all date pickers
-    initializeDatePickers();
-
-    // Initialize month filter calendar
-    initializeMonthFilter();
-});
-
-// Tab switch
-function switchTab(tabName) {
-    document.querySelectorAll('[id$="Container"]').forEach(c => c.classList.add('hidden'));
-    document.querySelectorAll('[role="tab"]').forEach(t => {
-        t.classList.remove('text-white', 'bg-green-600');
-        t.classList.add('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
-        t.setAttribute('aria-selected', 'false');
-    });
-
-    const activeContainer = document.getElementById(tabName + 'Container');
-    const activeTab = document.getElementById(tabName + 'Tab');
-    if (activeContainer && activeTab) {
-        activeContainer.classList.remove('hidden');
-        activeTab.classList.remove('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
-        activeTab.classList.add('text-white', 'bg-green-600');
-        activeTab.setAttribute('aria-selected', 'true');
-    }
-
-    const url = new URL(window.location);
-    url.searchParams.set('tab', tabName);
-    window.history.replaceState({}, '', url);
-}
-
-// Table filter
-function filterTable(tableId, searchTerm) {
-    const rows = document.querySelectorAll(`#${tableId} tr`);
-    let visibleCount = 0;
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        if (text.includes(searchTerm)) {
-            row.style.display = '';
-            visibleCount++;
-        } else row.style.display = 'none';
-    });
-
-    const countElement = document.getElementById(tableId.replace('Table', 'Count'));
-    if (countElement) countElement.textContent = visibleCount;
-}
-
-// Modals
-function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('flex');
-        modal.classList.add('hidden');
-        document.body.style.overflow = 'auto';
-    }
-}
-
-// Month Filter (Basic flatpickr)
-function initializeMonthFilter() {
-    const monthFilter = document.getElementById('monthFilter');
-    if (!monthFilter) return;
-
-    let calendar = null;
-    let selectedDate = null;
-
-    monthFilter.addEventListener('focus', function() {
-        if (calendar) return;
-
-        calendar = flatpickr(monthFilter, {
-            mode: "single",
-            dateFormat: "Y-m-d",
-            defaultDate: selectedDate,
-            static: true,
-            position: "auto",
-            animate: true,
-            onReady: function(selectedDates, dateStr, instance) {
-                instance.calendarContainer.style.zIndex = 50;
-            },
-            onChange: function(selectedDates) {
-                if (selectedDates.length > 0) {
-                    selectedDate = selectedDates[0];
-                    filterByMonth(selectedDate);
-                }
-            },
-            onOpen: function(selectedDates, dateStr, instance) {
-                document.addEventListener('click', function closeCalendar(e) {
-                    if (!instance.calendarContainer.contains(e.target) && e.target !== monthFilter) {
-                        instance.close();
-                        document.removeEventListener('click', closeCalendar);
-                    }
+        // Tab click events
+        Object.keys(tabs).forEach(tabKey => {
+            if (tabs[tabKey].tab) {
+                tabs[tabKey].tab.addEventListener('click', () => {
+                    console.log('Tab clicked:', tabKey);
+                    switchTab(tabKey);
                 });
             }
         });
 
-        calendar.open();
-    });
+        // Search functionality
+        const searchElements = [
+            { inputId: 'searchPayroll', tableId: 'payrollTable' },
+            { inputId: 'searchTransaction', tableId: 'transactionTable' },
+            { inputId: 'searchAlerts', tableId: 'alertTable' }
+        ];
 
-    monthFilter.addEventListener('click', function() {
-        if (calendar) calendar.open();
-    });
-}
-
-// Filter by selected month
-function filterByMonth(date) {
-    const selectedMonth = date.getMonth() + 1;
-    const selectedYear = date.getFullYear();
-    const monthYear = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
-
-    ['payroll-row', 'transaction-row', 'alert-row'].forEach(cls => {
-        let visible = 0;
-        document.querySelectorAll(`.${cls}`).forEach(row => {
-            const rowPeriod = row.getAttribute('data-period');
-            if (rowPeriod === monthYear) {
-                row.style.display = '';
-                visible++;
-            } else row.style.display = 'none';
+        searchElements.forEach(item => {
+            const input = document.getElementById(item.inputId);
+            if (input) {
+                input.addEventListener('input', function() {
+                    filterTable(item.tableId, this.value.toLowerCase());
+                });
+            }
         });
-        const countEl = document.getElementById(cls.replace('-row','Count'));
-        if (countEl) countEl.textContent = visible;
-    });
-}
 
-// Clear month filter
-function clearMonthFilter() {
-    const monthFilter = document.getElementById('monthFilter');
-    if (monthFilter) monthFilter.value = '';
+        // Initialize all date pickers
+        initializeDatePickers();
 
-    const allRows = document.querySelectorAll('.payroll-row, .transaction-row, .alert-row');
-    allRows.forEach(row => row.style.display = '');
+        // Initialize month filter calendar
+        initializeMonthFilter();
 
-    ['payroll', 'transaction', 'alert'].forEach(id => {
-        const countEl = document.getElementById(id + 'Count');
-        if (countEl) countEl.textContent = document.querySelectorAll(`.${id}-row`).length;
-    });
-}
+        // Initialize employee selection toggles
+        toggleEmployeeSelection();
+        toggleRetroEmployeeSelection();
 
-// Initialize basic date pickers for all inputs that need calendar
-function initializeDatePickers() {
-    const dateInputs = ['monthFilter', 'payroll_period', 'retro_period'];
-    dateInputs.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            flatpickr(el, {
-                dateFormat: "Y-m-d"
+        // Add click events for quick action buttons
+        document.querySelectorAll('[onclick*="openModal"]').forEach(button => {
+            console.log('Found modal button:', button.getAttribute('onclick'));
+        });
+
+        // Add event listener for mark as read button
+        const markAlertReadBtn = document.getElementById('markAlertRead');
+        if (markAlertReadBtn) {
+            markAlertReadBtn.addEventListener('click', function() {
+                const alertId = this.getAttribute('data-alert-id');
+                if (alertId) {
+                    markAlertAsRead(alertId);
+                }
             });
         }
     });
-}
 
-// Close modals when clicking outside
-document.addEventListener('click', function(event) {
-    if (event.target.classList.contains('modal-overlay')) closeModal(event.target.id);
-});
+    // Tab switch
+    function switchTab(tabName) {
+        console.log('Switching to tab:', tabName);
 
-// Close modals with Escape key
-document.addEventListener('keydown', function(event) {
-    if (event.key === 'Escape') {
-        document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(modal => closeModal(modal.id));
+        // Hide all containers
+        document.querySelectorAll('[id$="Container"]').forEach(c => {
+            c.classList.add('hidden');
+        });
+
+        // Reset all tabs
+        document.querySelectorAll('[role="tab"]').forEach(t => {
+            t.classList.remove('text-white', 'bg-green-600');
+            t.classList.add('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
+            t.setAttribute('aria-selected', 'false');
+        });
+
+        // Activate selected tab and container
+        const activeContainer = document.getElementById(tabName + 'Container');
+        const activeTab = document.getElementById(tabName + 'Tab');
+
+        if (activeContainer && activeTab) {
+            activeContainer.classList.remove('hidden');
+            activeTab.classList.remove('text-gray-700', 'bg-gray-100', 'hover:bg-gray-200');
+            activeTab.classList.add('text-white', 'bg-green-600');
+            activeTab.setAttribute('aria-selected', 'true');
+            console.log('Tab activated:', tabName);
+        } else {
+            console.error('Tab or container not found:', tabName);
+        }
+
+        // Update URL
+        const url = new URL(window.location);
+        url.searchParams.set('tab', tabName);
+        window.history.replaceState({}, '', url);
     }
-});
 
+    // Table filter
+    function filterTable(tableId, searchTerm) {
+        const rows = document.querySelectorAll(`#${tableId} tr`);
+        let visibleCount = 0;
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const countElement = document.getElementById(tableId.replace('Table', 'Count'));
+        if (countElement) {
+            countElement.textContent = visibleCount;
+        }
+    }
+
+    // Modals
+    function openModal(modalId) {
+        console.log('Opening modal:', modalId);
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            console.log('Modal opened successfully');
+
+            // Reset selection fields when opening modals
+            if (modalId === 'runPayrollModal') {
+                toggleEmployeeSelection();
+            } else if (modalId === 'retroactivePayModal') {
+                toggleRetroEmployeeSelection();
+            }
+        } else {
+            console.error('Modal not found:', modalId);
+        }
+    }
+
+    function closeModal(modalId) {
+        console.log('Closing modal:', modalId);
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+    }
+
+    // Toggle employee selection fields for Run Payroll
+    function toggleEmployeeSelection() {
+        const selection = document.getElementById('employee_selection');
+        if (!selection) return;
+
+        const selectionValue = selection.value;
+        const singleDiv = document.getElementById('employee_id_single');
+        const multipleDiv = document.getElementById('employee_id_multiple');
+
+        // Hide all first
+        if (singleDiv) singleDiv.classList.add('hidden');
+        if (multipleDiv) multipleDiv.classList.add('hidden');
+
+        // Show relevant selection
+        if (selectionValue === 'single' && singleDiv) {
+            singleDiv.classList.remove('hidden');
+        } else if (selectionValue === 'multiple' && multipleDiv) {
+            multipleDiv.classList.remove('hidden');
+        }
+    }
+
+    // Toggle employee selection fields for Retroactive Pay
+    function toggleRetroEmployeeSelection() {
+        const selection = document.getElementById('retro_employee_selection');
+        if (!selection) return;
+
+        const selectionValue = selection.value;
+        const singleDiv = document.getElementById('retro_employee_single');
+        const multipleDiv = document.getElementById('retro_employee_multiple');
+
+        // Hide all first
+        if (singleDiv) singleDiv.classList.add('hidden');
+        if (multipleDiv) multipleDiv.classList.add('hidden');
+
+        // Show relevant selection
+        if (selectionValue === 'single' && singleDiv) {
+            singleDiv.classList.remove('hidden');
+        } else if (selectionValue === 'multiple' && multipleDiv) {
+            multipleDiv.classList.remove('hidden');
+        }
+    }
+
+    // Month Filter
+    function initializeMonthFilter() {
+        const monthFilter = document.getElementById('monthFilter');
+        if (!monthFilter) return;
+
+        flatpickr(monthFilter, {
+            dateFormat: "Y-m-d",
+            onChange: function(selectedDates) {
+                if (selectedDates.length > 0) {
+                    filterByMonth(selectedDates[0]);
+                }
+            }
+        });
+    }
+
+    // Filter by selected month
+    function filterByMonth(date) {
+        const selectedMonth = date.getMonth() + 1;
+        const selectedYear = date.getFullYear();
+        const monthYear = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
+
+        ['payroll-row', 'transaction-row', 'alert-row'].forEach(cls => {
+            let visible = 0;
+            document.querySelectorAll(`.${cls}`).forEach(row => {
+                const rowPeriod = row.getAttribute('data-period');
+                if (rowPeriod === monthYear) {
+                    row.style.display = '';
+                    visible++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            const countEl = document.getElementById(cls.replace('-row','Count'));
+            if (countEl) countEl.textContent = visible;
+        });
+    }
+
+    // Clear month filter
+    function clearMonthFilter() {
+        const monthFilter = document.getElementById('monthFilter');
+        if (monthFilter) monthFilter.value = '';
+
+        const allRows = document.querySelectorAll('.payroll-row, .transaction-row, .alert-row');
+        allRows.forEach(row => row.style.display = '');
+
+        ['payroll', 'transaction', 'alert'].forEach(id => {
+            const countEl = document.getElementById(id + 'Count');
+            if (countEl) countEl.textContent = document.querySelectorAll(`.${id}-row`).length;
+        });
+    }
+
+    // Initialize basic date pickers
+    function initializeDatePickers() {
+        const dateInputs = ['monthFilter', 'payroll_period', 'retro_period'];
+        dateInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                flatpickr(el, {
+                    dateFormat: "Y-m-d"
+                });
+            }
+        });
+    }
+
+    // Close modals when clicking outside
+    document.addEventListener('click', function(event) {
+        if (event.target.classList.contains('fixed')) {
+            const modalId = event.target.id;
+            if (modalId.includes('Modal')) {
+                closeModal(modalId);
+            }
+        }
+    });
+
+    // Close modals with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const openModals = document.querySelectorAll('.fixed.flex');
+            openModals.forEach(modal => {
+                if (modal.id.includes('Modal')) {
+                    closeModal(modal.id);
+                }
+            });
+        }
+    });
+
+    // View payroll details
+    function viewPayrollDetails(payrollId) {
+        fetch(`/dashboard/payroll/${payrollId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const payroll = data.payroll;
+                    document.getElementById('payrollDetailsId').textContent = payroll.payroll_id;
+                    document.getElementById('payrollDetailsEmployee').textContent = payroll.employee_name;
+                    document.getElementById('payrollDetailsPeriod').textContent = payroll.period;
+                    document.getElementById('payrollDetailsBaseSalary').textContent = 'TZS ' + Number(payroll.base_salary).toLocaleString();
+                    document.getElementById('payrollDetailsAllowances').textContent = 'TZS ' + Number(payroll.allowances).toLocaleString();
+                    document.getElementById('payrollDetailsDeductions').textContent = 'TZS ' + Number(payroll.deductions).toLocaleString();
+                    document.getElementById('payrollDetailsNetSalary').textContent = 'TZS ' + Number(payroll.net_salary).toLocaleString();
+                    document.getElementById('payrollDetailsStatus').textContent = payroll.status;
+                    document.getElementById('payrollDetailsPaymentMethod').textContent = payroll.payment_method || 'N/A';
+                    openModal('payrollDetailsModal');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // View transaction details
+    function viewTransactionDetails(transactionId) {
+        fetch(`/dashboard/payroll/transaction/${transactionId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const transaction = data.transaction;
+                    document.getElementById('transactionDetailsId').textContent = transaction.transaction_id;
+                    document.getElementById('transactionDetailsEmployee').textContent = transaction.employee_name;
+                    document.getElementById('transactionDetailsAmount').textContent = 'TZS ' + Number(transaction.amount).toLocaleString();
+                    document.getElementById('transactionDetailsDate').textContent = new Date(transaction.transaction_date).toLocaleDateString();
+                    document.getElementById('transactionDetailsType').textContent = transaction.type.replace('_', ' ');
+                    document.getElementById('transactionDetailsStatus').textContent = transaction.status;
+                    document.getElementById('transactionDetailsPaymentMethod').textContent = transaction.payment_method || 'N/A';
+                    document.getElementById('transactionDetailsDescription').textContent = transaction.description || 'N/A';
+                    openModal('transactionDetailsModal');
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // View alert details
+    function viewAlertDetails(alertId) {
+        console.log('Opening alert details for:', alertId);
+
+        fetch(`/dashboard/payroll/alert/${alertId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const alert = data.alert;
+
+                    // Set basic information
+                    document.getElementById('alertDetailsId').textContent = alert.alert_id || 'N/A';
+                    document.getElementById('alertDetailsEmployee').textContent = alert.employee_name || 'N/A';
+                    document.getElementById('alertDetailsType').textContent = alert.type || 'N/A';
+                    document.getElementById('alertDetailsMessage').textContent = alert.message || 'N/A';
+                    document.getElementById('alertDetailsStatus').textContent = alert.status || 'N/A';
+                    document.getElementById('alertDetailsDepartment').textContent = alert.department || 'N/A';
+
+                    // Format date
+                    if (alert.created_at) {
+                        const alertDate = new Date(alert.created_at);
+                        document.getElementById('alertDetailsDate').textContent = alertDate.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
+                    } else {
+                        document.getElementById('alertDetailsDate').textContent = 'N/A';
+                    }
+
+                    // Set mark as read button
+                    const markReadBtn = document.getElementById('markAlertRead');
+                    if (markReadBtn) {
+                        markReadBtn.setAttribute('data-alert-id', alert.alert_id);
+
+                        // Show/hide button based on status
+                        if (alert.status && alert.status.toLowerCase() === 'read') {
+                            markReadBtn.classList.add('hidden');
+                        } else {
+                            markReadBtn.classList.remove('hidden');
+                        }
+                    }
+
+                    // Open modal
+                    openModal('alertDetailsModal');
+                } else {
+                    console.error('Failed to fetch alert details');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching alert details:', error);
+                // Set default values if fetch fails
+                document.getElementById('alertDetailsId').textContent = 'N/A';
+                document.getElementById('alertDetailsEmployee').textContent = 'N/A';
+                document.getElementById('alertDetailsMessage').textContent = 'Unable to load alert details';
+                openModal('alertDetailsModal');
+            });
+    }
+
+    // Mark alert as read
+    function markAlertAsRead(alertId) {
+        if (!alertId) return;
+
+        fetch(`/dashboard/payroll/alert/${alertId}/read`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal and reload page
+                closeModal('alertDetailsModal');
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                alert('Failed to mark alert as read');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error marking alert as read');
+        });
+    }
+
+    // Revert payroll
+    function revertPayroll(payrollId) {
+        if (confirm('Are you sure you want to revert this payroll? This action cannot be undone.')) {
+            fetch(`/dashboard/payroll/revert`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    payroll_id: payrollId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    }
+
+    // Form submission handlers
+    document.addEventListener('DOMContentLoaded', function() {
+        // Run Payroll Form
+        const runPayrollForm = document.getElementById('runPayrollForm');
+        if (runPayrollForm) {
+            runPayrollForm.addEventListener('submit', function(e) {
+                const spinner = document.getElementById('runPayrollSpinner');
+                if (spinner) spinner.classList.remove('hidden');
+            });
+        }
+
+        // Retroactive Pay Form
+        const retroactivePayForm = document.getElementById('retroactivePayForm');
+        if (retroactivePayForm) {
+            retroactivePayForm.addEventListener('submit', function(e) {
+                const spinner = document.getElementById('retroactivePaySpinner');
+                if (spinner) spinner.classList.remove('hidden');
+            });
+        }
+
+        // Revert Payroll Form
+        const revertPayrollForm = document.getElementById('revertPayrollForm');
+        if (revertPayrollForm) {
+            revertPayrollForm.addEventListener('submit', function(e) {
+                const spinner = document.getElementById('revertPayrollSpinner');
+                if (spinner) spinner.classList.remove('hidden');
+            });
+        }
+
+        // Revert All Form
+        const revertAllForm = document.getElementById('revertAllForm');
+        if (revertAllForm) {
+            revertAllForm.addEventListener('submit', function(e) {
+                const spinner = document.getElementById('revertAllSpinner');
+                if (spinner) spinner.classList.remove('hidden');
+            });
+        }
+
+        // Add change events for employee selection dropdowns
+        const employeeSelection = document.getElementById('employee_selection');
+        if (employeeSelection) {
+            employeeSelection.addEventListener('change', toggleEmployeeSelection);
+        }
+
+        const retroEmployeeSelection = document.getElementById('retro_employee_selection');
+        if (retroEmployeeSelection) {
+            retroEmployeeSelection.addEventListener('change', toggleRetroEmployeeSelection);
+        }
+    });
 </script>
 @endsection

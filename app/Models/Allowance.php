@@ -9,7 +9,7 @@ class Allowance extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'allowance'; // Match renamed table
+    protected $table = 'allowance';
     protected $guarded = [];
 
     protected $casts = [
@@ -24,7 +24,7 @@ class Allowance extends Model
     public function employees()
     {
         return $this->belongsToMany(Employee::class, 'employee_allowance', 'allowance_id', 'employee_id')
-                    ->withPivot('id')
+                    ->withPivot('amount')
                     ->withTimestamps();
     }
 }

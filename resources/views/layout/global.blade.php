@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>TanzaniaPay - @yield('title')</title>
+    <title>Summit Financial Advesory - @yield('title')</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
@@ -55,16 +55,33 @@
         #addEmployeeModal.hidden .modal-content, #editEmployeeModal.hidden .modal-content,
         #deactivateConfirmModal.hidden .modal-content, #deleteConfirmModal.hidden .modal-content,
         #viewEmployeeModal.hidden .modal-content { transform: scale(0.95); opacity: 0; }
-        .notification-container { position: fixed; top: 20px; right: 20px; z-index: 1000; width: 320px; }
-        .notification { background: white; border-radius: 8px; padding: 16px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); display: flex; align-items: center; animation: slideIn 0.3s ease-in-out; }
-        .notification.success { border-left: 4px solid #10b981; }
-        .notification.error { border-left: 4px solid #ef4444; }
-        .notification .close-btn { margin-left: auto; cursor: pointer; color: #6b7280; }
+        .notification-container { position: fixed; top: 20px; right: 20px; z-index: 1000; width: 350px; }
+        .notification { background: white; border-radius: 12px; padding: 0; margin-bottom: 12px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); overflow: hidden; animation: slideIn 0.4s ease-in-out; border-left: 5px solid; }
+        .notification.success { border-left-color: #10b981; }
+        .notification.error { border-left-color: #ef4444; }
+        .notification.warning { border-left-color: #f59e0b; }
+        .notification.info { border-left-color: #3b82f6; }
+        .notification-header { padding: 12px 16px; background: linear-gradient(135deg, #1a365d 0%, #153e75 100%); color: white; display: flex; align-items: center; justify-content: space-between; }
+        .notification-sender { font-weight: 600; font-size: 14px; display: flex; align-items: center; }
+        .notification-sender i { margin-right: 8px; }
+        .notification-time { font-size: 11px; opacity: 0.8; }
+        .notification-body { padding: 14px 16px; color: #374151; font-size: 13px; line-height: 1.4; }
+        .notification-actions { padding: 10px 16px; background: #f9fafb; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e5e7eb; }
+        .notification-category { font-size: 11px; color: #6b7280; font-weight: 500; }
+        .notification-close { background: none; border: none; color: #6b7280; cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s; }
+        .notification-close:hover { background: #e5e7eb; color: #374151; }
         .logo-container { width: 100%; display: flex; align-items: center; justify-content: center; padding: 8px 16px; }
         .logo-container img { width: 100%; max-height: 64px; object-fit: contain; }
         .sidebar.collapsed .logo-container { padding: 8px; }
         .sidebar.collapsed .logo-container img { max-height: 48px; }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideIn { 
+            from { transform: translateX(100%); opacity: 0; } 
+            to { transform: translateX(0); opacity: 1; } 
+        }
+        @keyframes slideOut { 
+            from { transform: translateX(0); opacity: 1; } 
+            to { transform: translateX(100%); opacity: 0; } 
+        }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
         @media (max-width: 768px) {
             .sidebar { width: 256px; transform: translateX(-100%); position: fixed; z-index: 50; height: 100vh; }
@@ -130,7 +147,7 @@
         <div class="sidebar text-white p-6 flex flex-col fixed h-full" id="sidebar">
             <div class="flex items-center mb-10 justify-center">
                 <div class="logo-container">
-                    <img src="{{ asset('assets/banner.jpg') }}" alt="TanzaniaPay Logo" class="h-10 w-auto">
+                    <img src="{{ asset('assets/banner.jpg') }}" alt="Summit Financial Advesory Logo" class="h-10 w-auto">
                 </div>
             </div>
             <nav class="flex-1">
@@ -249,27 +266,52 @@
             // Notification system
             let notifications = [];
 
-            function showNotification(message, type = 'success') {
+            function showNotification(message, type = 'success', category = 'System') {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+
                 const notification = document.createElement('div');
                 notification.className = `notification ${type}`;
                 notification.innerHTML = `
-                    <span>${message}</span>
-                    <span class="close-btn fas fa-times"></span>
+                    <div class="notification-header">
+                        <div class="notification-sender">
+                            <i class="fas ${getNotificationIcon(type)}"></i>
+                            Summit Financial Advesory
+                        </div>
+                        <div class="notification-time">${timeString}</div>
+                    </div>
+                    <div class="notification-body">
+                        ${message}
+                    </div>
+                    <div class="notification-actions">
+                        <span class="notification-category">${category}</span>
+                        <button class="notification-close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 `;
+                
                 notificationContainer.appendChild(notification);
-
                 notifications.push(notification);
 
+                // Auto-remove after 6 seconds
                 setTimeout(() => {
-                    notification.style.animation = 'slideOut 0.3s ease-in-out';
-                    setTimeout(() => {
-                        notification.remove();
-                        notifications = notifications.filter(n => n !== notification);
-                        updateNotificationDot();
-                    }, 300);
-                }, 5000);
+                    if (notification.parentNode) {
+                        notification.style.animation = 'slideOut 0.3s ease-in-out';
+                        setTimeout(() => {
+                            notification.remove();
+                            notifications = notifications.filter(n => n !== notification);
+                            updateNotificationDot();
+                        }, 300);
+                    }
+                }, 6000);
 
-                const closeBtn = notification.querySelector('.close-btn');
+                // Manual close
+                const closeBtn = notification.querySelector('.notification-close');
                 closeBtn.addEventListener('click', () => {
                     notification.style.animation = 'slideOut 0.3s ease-in-out';
                     setTimeout(() => {
@@ -282,34 +324,84 @@
                 updateNotificationDot();
             }
 
+            function getNotificationIcon(type) {
+                const icons = {
+                    'success': 'fa-check-circle',
+                    'error': 'fa-exclamation-circle',
+                    'warning': 'fa-exclamation-triangle',
+                    'info': 'fa-info-circle'
+                };
+                return icons[type] || 'fa-bell';
+            }
+
             function updateNotificationDot() {
                 notificationDot.classList.toggle('hidden', notifications.length === 0);
             }
 
             notificationToggle.addEventListener('click', () => {
                 if (notifications.length === 0) {
-                    showNotification('No new notifications', 'success');
+                    showNotification('No new notifications available', 'info', 'System');
                 }
             });
 
-            // Check if welcome notification has been shown
-            @if($userRole)
-                const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
-                if (!hasSeenWelcome) {
-                    showNotification('Welcome to TanzaniaPay!', 'success');
-                    sessionStorage.setItem('hasSeenWelcome', 'true');
-                }
+            // Handle Laravel flash messages with appropriate categories
+            @if(session('success'))
+                showNotification("{{ session('success') }}", 'success', getMessageCategory("{{ session('success') }}"));
+            @endif
+            
+            @if(session('error'))
+                showNotification("{{ session('error') }}", 'error', getMessageCategory("{{ session('error') }}"));
+            @endif
+            
+            @if(session('warning'))
+                showNotification("{{ session('warning') }}", 'warning', getMessageCategory("{{ session('warning') }}"));
+            @endif
+            
+            @if(session('info'))
+                showNotification("{{ session('info') }}", 'info', getMessageCategory("{{ session('info') }}"));
             @endif
 
-            // Add slideOut animation
-            const styleSheet = document.createElement('style');
-            styleSheet.textContent = `
-                @keyframes slideOut {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
+            // Function to determine message category based on content
+            function getMessageCategory(message) {
+                const lowerMessage = message.toLowerCase();
+                
+                if (lowerMessage.includes('payroll') || lowerMessage.includes('salary') || lowerMessage.includes('payment')) {
+                    return 'Payroll';
+                } else if (lowerMessage.includes('attendance') || lowerMessage.includes('check-in') || lowerMessage.includes('check-out')) {
+                    return 'Attendance';
+                } else if (lowerMessage.includes('leave') || lowerMessage.includes('likizo')) {
+                    return 'Leave';
+                } else if (lowerMessage.includes('report') || lowerMessage.includes('ripoti')) {
+                    return 'Reports';
+                } else if (lowerMessage.includes('employee') || lowerMessage.includes('mfanyakazi')) {
+                    return 'Employee';
+                } else if (lowerMessage.includes('sync') || lowerMessage.includes('biometric')) {
+                    return 'System';
+                } else {
+                    return 'System';
                 }
-            `;
-            document.head.appendChild(styleSheet);
+            }
+
+            // Add clickable functionality to notifications
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.notification')) {
+                    const notification = e.target.closest('.notification');
+                    const message = notification.querySelector('.notification-body').textContent;
+                    
+                    // Navigate based on notification content
+                    if (message.includes('payroll') || message.includes('salary')) {
+                        window.location.href = "{{ route('payroll') }}";
+                    } else if (message.includes('attendance')) {
+                        window.location.href = "{{ route('dashboard.attendance') }}";
+                    } else if (message.includes('leave')) {
+                        window.location.href = "{{ route('dashboard.attendance') }}#leave-requests";
+                    } else if (message.includes('report')) {
+                        window.location.href = "{{ route('reports') }}";
+                    } else if (message.includes('employee portal')) {
+                        window.location.href = "{{ route('employee.portal') }}";
+                    }
+                }
+            });
         });
     </script>
 </body>

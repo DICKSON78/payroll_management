@@ -154,15 +154,15 @@
                     <tbody id="attendanceTable" class="divide-y divide-gray-100">
                         @foreach($currentWeekAttendances as $attendance)
                             @if(strtolower(Auth::user()->role) === 'admin' || strtolower(Auth::user()->role) === 'hr' || (strtolower(Auth::user()->role) === 'employee' && Auth::user()->id === $attendance->employee_id))
-                                <tr id="attendance-{{ $attendance->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 attendance-row group" data-employee="{{ strtolower($attendance->employee->name) }}" data-date="{{ $attendance->date?->format('Y-m-d') ?? '' }}">
+                                <tr id="attendance-{{ $attendance->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 attendance-row group" data-employee="{{ strtolower($attendance->employee_name) }}" data-date="{{ $attendance->date?->format('Y-m-d') ?? '' }}">
                                     <td class="py-4 px-6">
                                         <div class="flex items-center">
                                             <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                                                <span class="font-medium text-green-800">{{ substr($attendance->employee->name, 0, 1) }}</span>
+                                                <span class="font-medium text-green-800">{{ substr($attendance->employee_name, 0, 1) }}</span>
                                             </div>
                                             <div>
-                                                <div class="font-medium text-gray-900">{{ $attendance->employee->name }}</div>
-                                                <div class="text-sm text-gray-500">{{ $attendance->employee->email }}</div>
+                                                <div class="font-medium text-gray-900">{{ $attendance->employee_name }}</div>
+                                                <div class="text-sm text-gray-500">{{ $attendance->employee_email }}</div>
                                             </div>
                                         </div>
                                     </td>
@@ -174,10 +174,10 @@
                                     @if(strtolower(Auth::user()->role) === 'admin' || strtolower(Auth::user()->role) === 'hr')
                                         <td class="py-4 px-6">
                                             <div class="flex items-center space-x-2">
-                                                <button onclick="editAttendance({{ $attendance->id }})" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Edit" aria-label="Edit attendance for {{ $attendance->employee->name }}">
+                                                <button onclick="editAttendance({{ $attendance->id }})" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Edit" aria-label="Edit attendance for {{ $attendance->employee_name }}">
                                                     <i class="fas fa-edit text-sm"></i>
                                                 </button>
-                                                <button onclick="requestLeaveForEmployee({{ $attendance->employee_id }})" class="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition-all duration-200" title="Request Leave" aria-label="Request leave for {{ $attendance->employee->name }}">
+                                                <button onclick="requestLeaveForEmployee({{ $attendance->employee_id }})" class="text-blue-600 hover:text-blue-800 p-1.5 rounded-md hover:bg-blue-50 transition-all duration-200" title="Request Leave" aria-label="Request leave for {{ $attendance->employee_name }}">
                                                     <i class="fas fa-calendar-plus text-sm"></i>
                                                 </button>
                                             </div>
@@ -374,21 +374,21 @@
                     <tbody id="leaveRequestsTable" class="divide-y divide-gray-100">
                         @foreach($leaveRequests as $leaveRequest)
                             @if(strtolower(Auth::user()->role) === 'admin' || strtolower(Auth::user()->role) === 'hr' || (strtolower(Auth::user()->role) === 'employee' && Auth::user()->id === $leaveRequest->employee_id))
-                        <tr id="leave-request-{{ $leaveRequest->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 leave-request-row group" data-employee="{{ strtolower($leaveRequest->employee->name) }}" data-leave-type="{{ strtolower($leaveRequest->leave_type) }}">
+                        <tr id="leave-request-{{ $leaveRequest->id }}" class="bg-white hover:bg-gray-50 transition-all duration-200 leave-request-row group" data-employee="{{ strtolower($leaveRequest->employee_name) }}" data-leave-type="{{ strtolower($leaveRequest->leave_type) }}">
                             <td class="py-4 px-6">
                                 <div class="flex items-center">
                                     <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                                        <span class="font-medium text-green-800">{{ substr($leaveRequest->employee->name, 0, 1) }}</span>
+                                        <span class="font-medium text-green-800">{{ substr($leaveRequest->employee_name, 0, 1) }}</span>
                                     </div>
                                     <div>
                                         @if(strtolower(Auth::user()->role) === 'admin' || strtolower(Auth::user()->role) === 'hr')
                                             <button onclick="reviewLeaveRequest({{ $leaveRequest->id }})" class="font-medium text-gray-900 hover:text-green-600 transition-colors">
-                                                {{ $leaveRequest->employee->name }}
+                                                {{ $leaveRequest->employee_name }}
                                             </button>
                                         @else
-                                            <div class="font-medium text-gray-900">{{ $leaveRequest->employee->name }}</div>
+                                            <div class="font-medium text-gray-900">{{ $leaveRequest->employee_name }}</div>
                                         @endif
-                                        <div class="text-sm text-gray-500">{{ $leaveRequest->employee->email }}</div>
+                                        <div class="text-sm text-gray-500">{{ $leaveRequest->employee_email }}</div>
                                     </div>
                                 </div>
                             </td>
@@ -405,7 +405,7 @@
                             @if(strtolower(Auth::user()->role) === 'admin' || strtolower(Auth::user()->role) === 'hr')
                                 <td class="py-4 px-6">
                                     <div class="flex items-center space-x-2">
-                                        <button onclick="reviewLeaveRequest({{ $leaveRequest->id }})" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Review" aria-label="Review leave request for {{ $leaveRequest->employee->name }}">
+                                        <button onclick="reviewLeaveRequest({{ $leaveRequest->id }})" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Review" aria-label="Review leave request for {{ $leaveRequest->employee_name }}">
                                             <i class="fas fa-eye text-sm"></i>
                                         </button>
                                     </div>

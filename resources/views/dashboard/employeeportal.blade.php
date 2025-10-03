@@ -12,7 +12,7 @@
 @endsection
 
 @section('header-subtitle')
-    <span class="text-gray-600">Manage your personal details, payslips, leave balances, and access your reports.</span>
+    <span class="text-gray-600">Manage your personal details, payslips, leave balances, security settings, and access your reports.</span>
 @endsection
 
 @section('content')
@@ -43,6 +43,9 @@
             <button id="reportsTab" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-t-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200" role="tab" aria-selected="false" aria-controls="reportsContainer">
                 My Reports
             </button>
+            <button id="securityTab" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-t-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200" role="tab" aria-selected="false" aria-controls="securityContainer">
+                Security
+            </button>
         </div>
     </div>
 
@@ -54,7 +57,28 @@
             </h3>
             <form id="updateDetailsForm" action="{{ route('employee.portal.update') }}" method="POST" class="space-y-6">
                 @csrf
+                <!-- REMOVED @method('PUT') -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div class="relative">
+                        <label class="block text-gray-600 text-sm font-medium mb-2" for="name">Full Name</label>
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fas fa-user text-gray-400 text-base"></i>
+                        </div>
+                        <input type="text" name="name" id="name" value="{{ old('name', $employee->name) }}" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="Your full name" required>
+                        @error('name')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div class="relative">
+                        <label class="block text-gray-600 text-sm font-medium mb-2" for="email">Email Address</label>
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fas fa-envelope text-gray-400 text-base"></i>
+                        </div>
+                        <input type="email" name="email" id="email" value="{{ old('email', $employee->email) }}" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="your@email.com" required>
+                        @error('email')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
                     <div>
                         <label for="phone" class="block text-gray-600 text-sm font-medium mb-2">Phone</label>
                         <input type="text" name="phone" id="phone" value="{{ $employee->phone ?? '' }}" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200" placeholder="Enter phone number">
@@ -66,6 +90,20 @@
                         <label for="address" class="block text-gray-600 text-sm font-medium mb-2">Address</label>
                         <input type="text" name="address" id="address" value="{{ $employee->address ?? '' }}" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200" placeholder="Enter address">
                         @error('address')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="department" class="block text-gray-600 text-sm font-medium mb-2">Department</label>
+                        <input type="text" name="department" id="department" value="{{ $employee->department ?? '' }}" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200" placeholder="Enter department">
+                        @error('department')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="position" class="block text-gray-600 text-sm font-medium mb-2">Position</label>
+                        <input type="text" name="position" id="position" value="{{ $employee->position ?? '' }}" class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200" placeholder="Enter position">
+                        @error('position')
                             <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                         @enderror
                     </div>
@@ -90,11 +128,11 @@
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
-                    <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center" onclick="toggleTab('updateDetailsTab')">
-                        <i class="fas fa-times mr-2"></i> Cancel
+                    <button type="button" class="text-white bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center" onclick="resetUpdateDetailsForm()">
+                        <i class="fas fa-undo mr-2"></i> Reset
                     </button>
                     <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center">
-                        <i class="fas fa-check mr-2"></i> Update Details
+                        <i class="fas fa-save mr-2"></i> Update Details
                     </button>
                 </div>
             </form>
@@ -136,9 +174,9 @@
                     </thead>
                     <tbody id="payslipsTable" class="divide-y divide-gray-100">
                         @foreach($payslips as $payslip)
-                            <tr class="bg-white hover:bg-gray-50 transition-all duration-200 payslip-row group" data-period="{{ strtolower($payslip->period ?? $payslip->pay_period ?? '') }}">
-                                <td class="py-4 px-6 text-sm text-gray-600">{{ $payslip->period ?? $payslip->pay_period ?? 'N/A' }}</td>
-                                <td class="py-4 px-6 text-sm text-gray-600">{{ number_format($payslip->gross_salary ?? 0, 2) }}</td>
+                            <tr class="bg-white hover:bg-gray-50 transition-all duration-200 payslip-row group" data-period="{{ strtolower($payslip->period ?? '') }}">
+                                <td class="py-4 px-6 text-sm text-gray-600">{{ $payslip->period ?? 'N/A' }}</td>
+                                <td class="py-4 px-6 text-sm text-gray-600">{{ number_format(($payslip->base_salary + $payslip->allowances) ?? 0, 2) }}</td>
                                 <td class="py-4 px-6 text-sm text-gray-600">{{ number_format($payslip->net_salary ?? 0, 2) }}</td>
                                 <td class="py-4 px-6">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ ($payslip->status ?? 'Pending') == 'Processed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
@@ -147,7 +185,7 @@
                                     </span>
                                 </td>
                                 <td class="py-4 px-6 text-sm">
-                                    <a href="{{ route('employee.payslip.download', $payslip->id) }}" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Download payslip">
+                                    <a href="{{ route('employee.portal.download.payslip', $payslip->id) }}" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Download payslip">
                                         <i class="fas fa-download mr-1"></i> Download
                                     </a>
                                 </td>
@@ -203,8 +241,8 @@
                     <p class="text-sm text-gray-500 mt-1">{{ $leaveBalances['sick_leave_balance'] ?? 0 }} days remaining</p>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
-                    <h4 class="font-medium text-gray-900">Vacation Leave</h4>
-                    <p class="text-sm text-gray-500 mt-1">{{ $leaveBalances['vacation_leave_balance'] ?? 0 }} days remaining</p>
+                    <h4 class="font-medium text-gray-900">Annual Leave</h4>
+                    <p class="text-sm text-gray-500 mt-1">{{ $leaveBalances['annual_leave_balance'] ?? 0 }} days remaining</p>
                 </div>
                 <div class="bg-gray-50 p-4 rounded-lg shadow-sm">
                     <h4 class="font-medium text-gray-900">Maternity Leave</h4>
@@ -266,7 +304,7 @@
                                     </span>
                                 </td>
                                 <td class="py-4 px-6 text-sm">
-                                    <a href="{{ route('employee.report.download', $report->id) }}" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Download report">
+                                    <a href="{{ route('employee.portal.download.report', $report->id) }}" class="text-green-600 hover:text-green-800 p-1.5 rounded-md hover:bg-green-50 transition-all duration-200" title="Download report">
                                         <i class="fas fa-download mr-1"></i> Download
                                     </a>
                                 </td>
@@ -310,6 +348,62 @@
         @endif
     </div>
 
+    <!-- Security Container -->
+    <div id="securityContainer" class="hidden">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 sm:p-8">
+            <h3 class="text-lg font-medium text-gray-700 flex items-center mb-4">
+                <i class="fas fa-user-cog text-green-500 mr-2"></i> Security Settings
+            </h3>
+            <form action="{{ route('employee.portal.security') }}" method="POST" class="space-y-6">
+                @csrf
+                <!-- REMOVED @method('PUT') -->
+                
+                <!-- Current Password Field - ADDED -->
+                <div class="relative">
+                    <label class="block text-gray-600 text-sm font-medium mb-2" for="current_password">Current Password</label>
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <i class="fas fa-lock text-gray-400 text-base"></i>
+                    </div>
+                    <input type="password" name="current_password" id="current_password" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="Enter current password" required>
+                    @error('current_password')
+                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="relative">
+                        <label class="block text-gray-600 text-sm font-medium mb-2" for="password">New Password</label>
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fas fa-lock text-gray-400 text-base"></i>
+                        </div>
+                        <input type="password" name="password" id="password" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="Enter new password" required>
+                        @error('password')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                    <div class="relative">
+                        <label class="block text-gray-600 text-sm font-medium mb-2" for="password_confirmation">Confirm Password</label>
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fas fa-lock text-gray-400 text-base"></i>
+                        </div>
+                        <input type="password" name="password_confirmation" id="password_confirmation" class="pl-10 w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-white shadow-sm text-gray-900 placeholder-gray-500" placeholder="Confirm new password" required>
+                        @error('password_confirmation')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="resetSecurityForm()" class="text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 focus:ring-4 focus:ring-gray-100 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center shadow-sm hover:shadow-md">
+                        <i class="fas fa-undo mr-2"></i> Reset
+                    </button>
+                    <button type="submit" class="text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2 text-center transition-all duration-200 flex items-center shadow-sm hover:shadow-md">
+                        <i class="fas fa-save mr-2"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 @endsection
 
 @section('modals')
@@ -319,10 +413,14 @@
 <script>
     // Initialize Tab Navigation
     document.addEventListener('DOMContentLoaded', function() {
-        document.getElementById('updateDetailsTab').addEventListener('click', () => toggleTab('updateDetailsTab'));
-        document.getElementById('payslipsTab').addEventListener('click', () => toggleTab('payslipsTab'));
-        document.getElementById('leaveBalancesTab').addEventListener('click', () => toggleTab('leaveBalancesTab'));
-        document.getElementById('reportsTab').addEventListener('click', () => toggleTab('reportsTab'));
+        // Tab click event listeners
+        const tabs = ['updateDetailsTab', 'payslipsTab', 'leaveBalancesTab', 'reportsTab', 'securityTab'];
+        tabs.forEach(tabId => {
+            const tab = document.getElementById(tabId);
+            if (tab) {
+                tab.addEventListener('click', () => toggleTab(tabId));
+            }
+        });
 
         // Search functionality for payslips
         const searchPayslips = document.getElementById('searchPayslips');
@@ -353,15 +451,23 @@
             });
         }
 
-        // Reset form on tab switch
-        document.getElementById('updateDetailsTab').addEventListener('click', () => {
-            document.getElementById('updateDetailsForm').reset();
+        // Add loading states to forms
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function() {
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+                }
+            });
         });
     });
 
+    // Tab navigation functionality
     function toggleTab(tabId) {
-        const tabs = ['updateDetailsTab', 'payslipsTab', 'leaveBalancesTab', 'reportsTab'];
-        const containers = ['updateDetailsContainer', 'payslipsContainer', 'leaveBalancesContainer', 'reportsContainer'];
+        const tabs = ['updateDetailsTab', 'payslipsTab', 'leaveBalancesTab', 'reportsTab', 'securityTab'];
+        const containers = ['updateDetailsContainer', 'payslipsContainer', 'leaveBalancesContainer', 'reportsContainer', 'securityContainer'];
 
         tabs.forEach(id => {
             const tab = document.getElementById(id);
@@ -384,10 +490,24 @@
             activeTab.setAttribute('aria-selected', 'true');
         }
 
-        const containerId = tabId === 'updateDetailsTab' ? 'updateDetailsContainer' :
-                           tabId === 'payslipsTab' ? 'payslipsContainer' :
-                           tabId === 'leaveBalancesTab' ? 'leaveBalancesContainer' : 'reportsContainer';
+        const containerId = tabId.replace('Tab', 'Container');
         const container = document.getElementById(containerId);
         if (container) container.classList.remove('hidden');
+
+        // Reset forms when switching tabs
+        if (tabId === 'updateDetailsTab') {
+            resetUpdateDetailsForm();
+        } else if (tabId === 'securityTab') {
+            resetSecurityForm();
+        }
+    }
+
+    // Form reset functions
+    function resetUpdateDetailsForm() {
+        document.getElementById('updateDetailsForm').reset();
+    }
+
+    function resetSecurityForm() {
+        document.getElementById('securityContainer').querySelector('form').reset();
     }
 </script>

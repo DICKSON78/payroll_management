@@ -5,60 +5,115 @@ namespace App\Imports;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Models\Role;
+use App\Models\Bank;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class EmployeesImport implements ToCollection, WithHeadingRow
 {
     public function collection(Collection $rows)
     {
-        foreach ($rows as $row) {
-            // Skip empty rows
-            if (empty($row['name']) && empty($row['email'])) {
+        Log::info('Starting bulk import with ' . $rows->count() . ' rows');
+        
+        foreach ($rows as $index => $row) {
+            try {
+                Log::info('Processing row ' . ($index + 1) . ': ' . json_encode($row->toArray()));
+                
+                // Validate required fields
+                if (empty($row['name']) || empty($row['email']) || empty($row['department']) || 
+                    empty($row['position']) || empty($row['employment_type']) || empty($row['hire_date']) || 
+                    empty($row['base_salary']) || empty($row['role'])) {
+                    Log::error('Missing required fields in row ' . ($index + 1));
+                    continue;
+                }
+
+                // Check if email already exists
+                if (Employee::where('email', $row['email'])->exists()) {
+                    Log::error('Email already exists: ' . $row['email']);
+                    continue;
+                }
+
+                // Validate department exists
+                if (!Department::where('name', $row['department'])->exists()) {
+                    Log::error('Department does not exist: ' . $row['department']);
+                    continue;
+                }
+
+                // Validate role exists
+                if (!Role::where('slug', $row['role'])->exists()) {
+                    Log::error('Role does not exist: ' . $row['role']);
+                    continue;
+                }
+
+                // Generate unique employee ID
+                $employeeId = $this->generateUniqueEmployeeId();
+
+                // Prepare employee data
+                $employeeData = [
+                    'employee_id' => $employeeId,
+                    'name' => $row['name'],
+                    'email' => $row['email'],
+                    'password' => Hash::make('password123'), // Default password
+                    'department' => $row['department'],
+                    'position' => $row['position'],
+                    'role' => $row['role'],
+                    'employment_type' => $row['employment_type'],
+                    'hire_date' => Carbon::parse($row['hire_date']),
+                    'base_salary' => $row['base_salary'],
+                    'status' => 'active',
+                    'allowances' => 0.00,
+                    'deductions' => 0.00,
+                ];
+
+                // Add optional fields
+                $optionalFields = [
+                    'phone', 'gender', 'dob', 'nationality', 'address',
+                    'bank_name', 'account_number', 'nssf_number', 'tin_number', 'nhif_number'
+                ];
+
+                foreach ($optionalFields as $field) {
+                    if (isset($row[$field]) && !empty($row[$field])) {
+                        if ($field === 'dob' || $field === 'contract_end_date') {
+                            $employeeData[$field] = Carbon::parse($row[$field]);
+                        } else {
+                            $employeeData[$field] = $row[$field];
+                        }
+                    }
+                }
+
+                // Handle contract end date for contract employees
+                if ($row['employment_type'] === 'contract' && !empty($row['contract_end_date'])) {
+                    $employeeData['contract_end_date'] = Carbon::parse($row['contract_end_date']);
+                }
+
+                Log::info('Creating employee with data: ' . json_encode($employeeData));
+                
+                // Create employee
+                Employee::create($employeeData);
+                
+                Log::info('Successfully created employee: ' . $employeeId);
+
+            } catch (\Exception $e) {
+                Log::error('Error importing row ' . ($index + 1) . ': ' . $e->getMessage());
                 continue;
             }
-
-            // Check if email already exists
-            if (Employee::where('email', $row['email'])->exists()) {
-                continue; // Skip duplicate emails
-            }
-
-            // Generate employee ID
-            $employeeId = "EMP-" . strtoupper(Str::random(8));
-            
-            // Generate password
-            $nameParts = explode(' ', $row['name']);
-            $lastName = end($nameParts);
-            $password = Hash::make(strtolower($lastName ?: 'password123'));
-
-            // Create employee
-            Employee::create([
-                'employee_id' => $employeeId,
-                'name' => $row['name'],
-                'email' => $row['email'],
-                'password' => $password,
-                'phone' => $row['phone'] ?? null,
-                'department' => $row['department'],
-                'position' => $row['position'],
-                'employment_type' => $row['employment_type'],
-                'hire_date' => $row['hire_date'],
-                'base_salary' => $row['base_salary'],
-                'role' => $row['role'],
-                'status' => 'active',
-                'gender' => $row['gender'] ?? null,
-                'dob' => $row['dob'] ?? null,
-                'nationality' => $row['nationality'] ?? null,
-                'address' => $row['address'] ?? null,
-                'contract_end_date' => $row['contract_end_date'] ?? null,
-                'bank_name' => $row['bank_name'] ?? null,
-                'account_number' => $row['account_number'] ?? null,
-                'nssf_number' => $row['nssf_number'] ?? null,
-                'tin_number' => $row['tin_number'] ?? null,
-                'nhif_number' => $row['nhif_number'] ?? null,
-            ]);
         }
+        
+        Log::info('Bulk import completed');
+    }
+
+    private function generateUniqueEmployeeId()
+    {
+        $prefix = "EMP";
+        do {
+            $randomPart = strtoupper(Str::random(8));
+            $newId = $prefix . '-' . $randomPart;
+        } while (Employee::where('employee_id', $newId)->exists());
+        return $newId;
     }
 }

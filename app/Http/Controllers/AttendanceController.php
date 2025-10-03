@@ -104,15 +104,14 @@ class AttendanceController extends Controller
     /**
      * Clean up old attendance records (run weekly for ALL users)
      */
-    public function cleanupOldRecords()
-    {
-        // Keep only current week records for ALL users (both employees and admin/hr)
-        $startOfWeek = Carbon::now()->startOfWeek();
-
-        $deletedCount = Attendance::where('date', '<', $startOfWeek)->delete();
-
-        return redirect()->back()->with('success', "Cleaned up {$deletedCount} old attendance records.");
-    }
+public function cleanupOldRecords()
+{
+    $startOfWeek = Carbon::now()->startOfWeek();
+    $deletedCount = Attendance::where('date', '<', $startOfWeek)->delete();
+    
+    // NOTIFICATION: Cleanup imekamilika
+    return redirect()->back()->with('success', "Cleaned up {$deletedCount} old attendance records.");
+}
 
     /**
      * Store a new attendance record
@@ -202,57 +201,58 @@ class AttendanceController extends Controller
     /**
      * Request a leave
      */
-    public function requestLeave(Request $request)
-    {
-        $user = $this->currentUser();
-        $employee = $user;
+public function requestLeave(Request $request)
+{
+    $user = $this->currentUser();
+    $employee = $user;
 
-        // Validate request
-        $validator = Validator::make($request->all(), [
-            'employee_id' => 'required|exists:employees,id',
-            'leave_type' => 'required|in:Sick Leave,Casual Leave,Paid Leave,Maternity Leave,Paternity Leave',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'reason' => 'nullable|string|max:500',
-        ]);
+    // Validate request
+    $validator = Validator::make($request->all(), [
+        'employee_id' => 'required|exists:employees,id',
+        'leave_type' => 'required|in:Sick Leave,Casual Leave,Paid Leave,Maternity Leave,Paternity Leave',
+        'start_date' => 'required|date',
+        'end_date' => 'required|date|after_or_equal:start_date',
+        'reason' => 'nullable|string|max:500',
+    ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
-
-        // Check if user is employee and trying to request leave for someone else
-        if (strtolower($user->role) === 'employee' && $request->employee_id != $employee->id) {
-            return redirect()->back()->with('error', 'You can only request leave for yourself.');
-        }
-
-        // Generate unique request_id
-        $requestId = 'LRQ-' . Str::upper(Str::random(5));
-        while (LeaveRequest::where('request_id', $requestId)->exists()) {
-            $requestId = 'LRQ-' . Str::upper(Str::random(5));
-        }
-
-        // Calculate leave days
-        $startDate = Carbon::parse($request->start_date);
-        $endDate = Carbon::parse($request->end_date);
-        $days = $startDate->diffInDays($endDate) + 1;
-
-        // Get employee name
-        $employee = Employee::find($request->employee_id);
-
-        LeaveRequest::create([
-            'request_id' => $requestId,
-            'employee_id' => $request->employee_id,
-            'employee_name' => $employee->name,
-            'leave_type' => $request->leave_type,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
-            'days' => $days,
-            'reason' => $request->reason,
-            'status' => $request->status ?? 'Pending',
-        ]);
-
-        return redirect()->back()->with('success', 'Leave request submitted.');
+    if ($validator->fails()) {
+        return redirect()->back()->withErrors($validator)->withInput();
     }
+
+    // Check if user is employee and trying to request leave for someone else
+    if (strtolower($user->role) === 'employee' && $request->employee_id != $employee->id) {
+        return redirect()->back()->with('error', 'You can only request leave for yourself.');
+    }
+
+    // Generate unique request_id
+    $requestId = 'LRQ-' . Str::upper(Str::random(5));
+    while (LeaveRequest::where('request_id', $requestId)->exists()) {
+        $requestId = 'LRQ-' . Str::upper(Str::random(5));
+    }
+
+    // Calculate leave days
+    $startDate = Carbon::parse($request->start_date);
+    $endDate = Carbon::parse($request->end_date);
+    $days = $startDate->diffInDays($endDate) + 1;
+
+    // Get employee name
+    $employee = Employee::find($request->employee_id);
+
+    LeaveRequest::create([
+        'request_id' => $requestId,
+        'employee_id' => $request->employee_id,
+        'employee_name' => $employee->name,
+        'leave_type' => $request->leave_type,
+        'start_date' => $request->start_date,
+        'end_date' => $request->end_date,
+        'days' => $days,
+        'reason' => $request->reason,
+        'status' => $request->status ?? 'Pending',
+    ]);
+
+    // NOTIFICATION: Ombi la likizo limewasilishwa
+    return redirect()->back()->with('success', 'Leave request submitted.');
+}
 
     /**
      * Review a leave request
@@ -273,27 +273,28 @@ class AttendanceController extends Controller
     /**
      * Update a leave request
      */
-    public function updateLeaveRequest(Request $request, $id)
-    {
-        $this->authorizeRole(['admin', 'hr manager']);
-        $leaveRequest = LeaveRequest::findOrFail($id);
+public function updateLeaveRequest(Request $request, $id)
+{
+    $this->authorizeRole(['admin', 'hr manager']);
+    $leaveRequest = LeaveRequest::findOrFail($id);
 
-        $validator = Validator::make($request->all(), [
-            'status' => 'required|in:Pending,Approved,Rejected',
-            'approved_by' => 'nullable|exists:employees,id',
-        ]);
+    $validator = Validator::make($request->all(), [
+        'status' => 'required|in:Pending,Approved,Rejected',
+        'approved_by' => 'nullable|exists:employees,id',
+    ]);
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
-
-        $leaveRequest->update([
-            'status' => $request->status,
-            'approved_by' => $request->approved_by ?? Auth::id(),
-        ]);
-
-        return redirect()->route('dashboard.attendance')->with('success', 'Leave request updated.');
+    if ($validator->fails()) {
+        return redirect()->back()->withErrors($validator)->withInput();
     }
+
+    $leaveRequest->update([
+        'status' => $request->status,
+        'approved_by' => $request->approved_by ?? Auth::id(),
+    ]);
+
+    // NOTIFICATION: Ombi la likizo limehakikiwa
+    return redirect()->route('dashboard.attendance')->with('success', 'Leave request updated.');
+}
 
     /**
      * Export attendance records with date range

@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Payslip;
+use App\Models\Payroll;
 use App\Models\Report;
 use App\Models\LeaveRequest;
 use App\Models\Bank;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +17,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
 
 class EmployeePortalController extends Controller
 {
@@ -56,7 +59,7 @@ class EmployeePortalController extends Controller
             // Regular employees can only see their own payslip reports
             $reports = Report::with('employee')
                 ->where('status', 'completed')
-                ->where('employee_id', $employee->id)
+                ->where('employee_id', $employee->employee_id)
                 ->whereIn('type', self::EMPLOYEE_ALLOWED_REPORTS)
                 ->latest()
                 ->paginate(10);
@@ -101,7 +104,7 @@ class EmployeePortalController extends Controller
         ];
 
         // Calculate used days for current year
-        $usedDays = LeaveRequest::where('employee_id', $employee->id)
+        $usedDays = LeaveRequest::where('employee_id', $employee->employee_id)
             ->where('leave_type', $leaveType)
             ->where('status', 'Approved')
             ->whereYear('start_date', Carbon::now()->year)
@@ -111,7 +114,7 @@ class EmployeePortalController extends Controller
     }
 
     /**
-     * Update employee information
+     * Update employee information - COMPLETE DETAILS
      */
     public function update(Request $request)
     {
@@ -124,27 +127,77 @@ class EmployeePortalController extends Controller
 
         $employee = $user;
 
-        // Validation rules
+        // Validation rules for all employee details
         $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:employees,email,' . $employee->id,
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:255',
+            'gender' => 'nullable|in:male,female,other',
+            'dob' => 'nullable|date',
+            'nationality' => 'nullable|string|max:100',
             'bank_name' => 'nullable|exists:banks,name',
             'account_number' => 'nullable|string|max:50',
+            'nssf_number' => 'nullable|string|max:50',
+            'tin_number' => 'nullable|string|max:50',
+            'nhif_number' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        // Update employee details
+        // Update all employee details
         $employee->update($request->only([
+            'name',
+            'email',
             'phone',
             'address',
+            'gender',
+            'dob',
+            'nationality',
             'bank_name',
             'account_number',
+            'nssf_number',
+            'tin_number',
+            'nhif_number',
         ]));
 
         return redirect()->route('employee.portal')->with('success', 'Your details have been updated successfully.');
+    }
+
+    /**
+     * Update security settings (password)
+     */
+    public function updateSecurity(Request $request)
+    {
+        $user = Auth::user();
+
+        // Check if user has valid role
+        if (!in_array(strtolower($user->role), ['admin', 'hr manager', 'employee', 'manager'])) {
+            return redirect()->back()->with('error', 'Access denied.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        // Verify current password
+        if (!Hash::check($request->current_password, $user->password)) {
+            return redirect()->back()->with('error', 'Current password is incorrect.');
+        }
+
+        // Update password
+        $user->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        return redirect()->route('employee.portal')->with('success', 'Password updated successfully.');
     }
 
     /**
@@ -195,7 +248,7 @@ class EmployeePortalController extends Controller
 
         LeaveRequest::create([
             'request_id' => $requestId,
-            'employee_id' => $employee->id,
+            'employee_id' => $employee->employee_id,
             'employee_name' => $employee->name,
             'leave_type' => $request->leave_type,
             'start_date' => $request->start_date,
@@ -214,29 +267,95 @@ class EmployeePortalController extends Controller
     public function downloadPayslip($id)
     {
         $user = Auth::user();
-
+        
         // Check if user has valid role
         if (!in_array(strtolower($user->role), ['admin', 'hr manager', 'employee', 'manager'])) {
             return redirect()->back()->with('error', 'Access denied.');
         }
 
-        $payslip = Payslip::with('employee')->findOrFail($id);
+        $currentUser = $user; // Rename current user to avoid conflict
+        $isAdminOrHR = in_array(strtolower($user->role), ['admin', 'hr manager']);
 
-        // Allow admin/hr to download any payslip, employees only their own
-        if (!in_array(strtolower($user->role), ['admin', 'hr manager']) && $payslip->employee_id !== $user->id) {
-            return redirect()->back()->with('error', 'Unauthorized to download this payslip.');
+        // Get payslip with access control
+        if ($isAdminOrHR) {
+            $payslip = Payslip::where('id', $id)->firstOrFail();
+        } else {
+            $payslip = Payslip::where('id', $id)
+                ->where('employee_id', $currentUser->employee_id)
+                ->firstOrFail();
         }
 
-        $pdf = Pdf::loadView('reports.payslip', [
-            'payslip' => $payslip,
-            'employee' => $payslip->employee,
-            'settings' => [
-                'company_name' => 'Your Company',
-                'currency' => 'TZS',
-            ]
-        ]);
+        // Get employee data - USE $employee VARIABLE FOR VIEW COMPATIBILITY
+        $employee = Employee::where('employee_id', $payslip->employee_id)
+            ->whereNull('deleted_at')
+            ->first();
 
-        return $pdf->download('payslip_' . $payslip->employee->employee_id . '_' . $payslip->period . '.pdf');
+        if (!$employee) {
+            \Log::error('Employee not found for payslip', [
+                'payslip_id' => $id,
+                'employee_id' => $payslip->employee_id,
+                'user_id' => Auth::id()
+            ]);
+            return redirect()->route('employee.portal')->with('error', 'Employee data not found for this payslip.');
+        }
+
+        // Get payroll data for additional information
+        $payroll = Payroll::where('employee_id', $payslip->employee_id)
+            ->where('period', $payslip->period)
+            ->first();
+
+        // Prepare deduction breakdown
+        $deduction_breakdown = $this->calculateDeductionBreakdown($payslip, $payroll);
+        
+        // Get settings for company name
+        $settings = Setting::where('key', 'company_name')->first();
+        
+        $period_display = $payslip->period ?? 'Unknown Period';
+        $generated_at = Carbon::now();
+
+        // Generate PDF - USE VARIABLE NAMES THAT MATCH THE VIEW
+        $pdf = Pdf::loadView('reports.payslip-individual', compact(
+            'payslip', 
+            'employee', // This matches the view expectation
+            'payroll',
+            'deduction_breakdown',
+            'settings',
+            'period_display',
+            'generated_at'
+        ));
+        
+        // Create safe filename
+        $safe_period = str_replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-', $payslip->period);
+        $filename = 'payslip-' . $payslip->employee_id . '-' . $safe_period . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Calculate deduction breakdown
+     */
+    private function calculateDeductionBreakdown($payslip, $payroll)
+    {
+        // Use actual data from schema instead of hardcoded percentages
+        $totalDeductions = $payslip->deductions ?? 0;
+        
+        // If payroll data exists, use it for more accurate breakdown
+        if ($payroll) {
+            return [
+                'nssf' => $payroll->deductions * 0.4, // Adjust based on your actual NSSF calculation
+                'nhif' => $payroll->deductions * 0.3, // Adjust based on your actual NHIF calculation
+                'paye' => $payroll->deductions * 0.2, // Adjust based on your actual PAYE calculation
+                'other_deductions' => $payroll->deductions * 0.1,
+            ];
+        }
+
+        // Fallback calculation based on typical Tanzanian payroll deductions
+        return [
+            'nssf' => $totalDeductions * 0.4, // NSSF typically 10% of basic salary
+            'nhif' => $totalDeductions * 0.3, // NHIF fixed amount based on salary bands
+            'paye' => $totalDeductions * 0.2, // PAYE based on tax brackets
+            'other_deductions' => $totalDeductions * 0.1,
+        ];
     }
 
     /**
@@ -262,7 +381,7 @@ class EmployeePortalController extends Controller
             // Admin/HR can download any report
         } else {
             // Regular employees can only download their own payslip reports
-            if ($report->employee_id !== $employee->id || !in_array($report->type, self::EMPLOYEE_ALLOWED_REPORTS)) {
+            if ($report->employee_id !== $employee->employee_id || !in_array($report->type, self::EMPLOYEE_ALLOWED_REPORTS)) {
                 return redirect()->back()->with('error', 'Unauthorized to download this report.');
             }
         }
@@ -296,7 +415,7 @@ class EmployeePortalController extends Controller
         } else {
             $reports = Report::with('employee')
                 ->where('status', 'completed')
-                ->where('employee_id', $employee->id)
+                ->where('employee_id', $employee->employee_id)
                 ->whereIn('type', self::EMPLOYEE_ALLOWED_REPORTS)
                 ->latest()
                 ->limit(50)

@@ -12,6 +12,11 @@ class Employee extends Model implements AuthenticatableContract
 {
     use Authenticatable, SoftDeletes, Notifiable;
 
+    // ADD THESE 3 LINES - SET employee_id AS PRIMARY KEY
+    protected $primaryKey = 'employee_id';
+    public $incrementing = false;
+    protected $keyType = 'string';
+
     protected $guarded = [];
 
     protected $casts = [
@@ -73,7 +78,7 @@ class Employee extends Model implements AuthenticatableContract
      */
     public function getAuthIdentifierName()
     {
-        return 'id';
+        return 'employee_id';
     }
 
     /**
@@ -150,17 +155,16 @@ class Employee extends Model implements AuthenticatableContract
         \Log::info("Password reset requested for {$this->email}. Token: {$token}");
     }
 
-    // FIX: Relationship ya allowances
+    // FIXED: Corrected allowances relationship
     public function allowances()
     {
         return $this->belongsToMany(
             Allowance::class,
             'employee_allowance',
-            'employee_id',      // foreign pivot key (EMP-XXXX kwenye pivot)
-            'allowance_id',     // related pivot key
-            'employee_id',      // local key (EMP-XXXX kwenye employees)
-            'id'                // related key (id kwenye allowances)
-        )->withTimestamps();
+            'employee_id',
+            'allowance_id'
+        )->withPivot('amount')
+         ->withTimestamps();
     }
 
     public function departmentRel()
@@ -173,11 +177,17 @@ class Employee extends Model implements AuthenticatableContract
         return $this->belongsTo(Bank::class, 'bank_name', 'name');
     }
 
+    // FIXED: Corrected deductions relationship
     public function deductions()
     {
-        return $this->belongsToMany(Deduction::class, 'employee_deduction', 'employee_id', 'deduction_id')
-                    ->withPivot('id')
-                    ->withTimestamps();
+        return $this->belongsToMany(
+            Deduction::class,
+            'employee_deduction',
+            'employee_id',
+            'deduction_id'
+        )->withPivot('amount')
+         ->wherePivot('active', 1) // Remove this if you don't have active column in pivot
+         ->withTimestamps();
     }
 
     public function attendances()
@@ -379,4 +389,24 @@ class Employee extends Model implements AuthenticatableContract
             'last_login' => $this->last_login_at?->format('Y-m-d H:i:s'),
         ];
     }
+
+    // In Employee model
+public function updateSalaryData($adjustmentType, $amount)
+{
+    switch ($adjustmentType) {
+        case 'salary_adjustment':
+            $this->base_salary += $amount;
+            break;
+        case 'allowance':
+            $this->allowances += $amount;
+            break;
+        case 'deduction':
+            $this->deductions += $amount;
+            break;
+    }
+    
+    return $this->save();
+}
+
+
 }

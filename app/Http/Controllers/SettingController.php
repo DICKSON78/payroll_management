@@ -2,33 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Employee;
-use App\Models\Payroll;
-use App\Models\Payslip;
-use App\Models\ComplianceTask;
 use App\Models\Allowance;
 use App\Models\Deduction;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Routing\Controller;
-use Carbon\Carbon;
 
 class SettingController extends Controller
 {
-    /**
-     * Constructor to apply middleware
-     */
     public function __construct()
     {
         $this->middleware('auth');
     }
 
-    /**
-     * Display the settings dashboard
-     */
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -38,112 +28,98 @@ class SettingController extends Controller
             return redirect('/login')->with('error', 'Please log in.');
         }
 
-        // Restrict access to admin and hr manager roles
         if (!in_array(strtolower($user->role), ['admin', 'hr manager'])) {
             Log::warning('Unauthorized access attempt', ['user_id' => $user->id, 'role' => $user->role]);
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
-        // Default settings (aligned with schema and setting.blade.php)
-        $settings = [
-            'pay_schedule' => 'monthly',
-            'processing_day' => 25,
-            'default_currency' => 'TZS',
-            'overtime_calculation' => '1.5x',
-            'nssf_employer_rate' => 10.00,
-            'nssf_employee_rate' => 10.00,
-            'nhif_calculation_method' => 'tiered',
-            'paye_tax_free' => 270000,
-            'email_notifications' => ['payroll_processing', 'payment_confirmation'],
-            'sms_enabled' => false,
-            'sms_gateway' => 'twilio',
-            'sms_balance_alert' => 100,
-            'accounting_software' => '',
-            'api_key' => '',
-            'bank_api' => '',
-            'bank_endpoint' => '',
-            'attendance_sync' => false,
-            'sync_frequency' => 'daily',
-            'last_sync' => 'Never',
-        ];
-
-        // Fetch counts for dashboard
-        $totalEmployees = Employee::count();
-        $activePayrolls = Payroll::where('status', 'Processed')->count();
-        $payslipsThisMonth = Payslip::where('period', Carbon::now()->format('Y-m'))->count();
-        $pendingComplianceTasks = ComplianceTask::where('status', 'Pending')->count();
-
-        // Fetch allowances and deductions
+        $settings = $this->getSettings();
         $allowances = Allowance::all();
         $deductions = Deduction::all();
-
-        // Fetch employees for dropdowns
-        $employees = Employee::select('id', 'name')->orderBy('name')->get();
 
         return view('dashboard.setting', compact(
             'user',
             'settings',
-            'totalEmployees',
-            'activePayrolls',
-            'payslipsThisMonth',
-            'pendingComplianceTasks',
             'allowances',
-            'deductions',
-            'employees'
+            'deductions'
         ));
     }
 
-    /**
-     * Update personal account settings
-     */
-    public function updatePersonal(Request $request)
+    private function getSettings()
     {
-        $user = Auth::user();
-        if (!in_array(strtolower($user->role), ['admin', 'hr manager'])) {
-            return redirect()->back()->with('error', 'Unauthorized access.');
+        $settings = [];
+        
+        $settingRecords = Setting::all();
+        foreach ($settingRecords as $setting) {
+            $settings[$setting->key] = $this->castSettingValue($setting->value, $setting->type);
         }
 
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:employees,email,' . $user->id,
-            'password' => 'nullable|string|min:8|confirmed',
-        ]);
+        // Map schema keys to view expectations
+        $mappings = [
+            'pay_schedule' => 'payroll_frequency',
+            'default_currency' => 'currency',
+            'tax_rate' => 'tax_rate',
+        ];
 
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
+        foreach ($mappings as $schemaKey => $viewKey) {
+            if (isset($settings[$schemaKey])) {
+                $settings[$viewKey] = $settings[$schemaKey];
+            }
         }
 
-        try {
-            $user->update([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => $request->password ? Hash::make($request->password) : $user->password,
-            ]);
+        // Set defaults if not exists
+        $defaults = [
+            'payroll_frequency' => 'monthly',
+            'tax_rate' => 0.0,
+            'currency' => 'TZS',
+            'processing_day' => 25,
+        ];
 
-            Log::info('Personal account updated', ['user_id' => $user->id]);
-            return redirect()->route('settings.index')->with('success', 'Personal account updated successfully.');
-        } catch (\Exception $e) {
-            Log::error('Personal account update failed: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to update personal account: ' . $e->getMessage());
+        foreach ($defaults as $key => $defaultValue) {
+            if (!isset($settings[$key])) {
+                $settings[$key] = $defaultValue;
+            }
+        }
+
+        return (object) $settings;
+    }
+
+    private function castSettingValue($value, $type)
+    {
+        switch ($type) {
+            case 'integer':
+                return (int) $value;
+            case 'decimal':
+                return (float) $value;
+            case 'boolean':
+                return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+            case 'array':
+            case 'json':
+                if (is_array($value)) {
+                    return $value;
+                }
+                if (is_null($value) || empty($value)) {
+                    return [];
+                }
+                if (is_string($value)) {
+                    $decoded = json_decode($value, true);
+                    return json_last_error() === JSON_ERROR_NONE ? $decoded : [];
+                }
+                return [];
+            default:
+                return $value;
         }
     }
 
-    /**
-     * Update payroll configuration
-     */
     public function updatePayroll(Request $request)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
         $validator = Validator::make($request->all(), [
-            'pay_schedule' => 'required|in:monthly,bi-weekly,weekly',
+            'payroll_frequency' => 'required|in:monthly,biweekly,weekly',
+            'tax_rate' => 'required|numeric|min:0|max:100',
             'processing_day' => 'required|integer|min:1|max:31',
-            'default_currency' => 'required|in:TZS,USD',
-            'overtime_calculation' => 'required|in:1.5x,2x,custom',
-            'nssf_employer_rate' => 'required|numeric|min:0|max:100',
-            'nssf_employee_rate' => 'required|numeric|min:0|max:100',
-            'nhif_calculation_method' => 'required|in:tiered,fixed',
-            'paye_tax_free' => 'required|numeric|min:0',
+            'currency' => 'required|string|size:3',
         ]);
 
         if ($validator->fails()) {
@@ -151,18 +127,25 @@ class SettingController extends Controller
         }
 
         try {
-            $settings = [
-                'pay_schedule' => $request->pay_schedule,
+            $settingsData = [
+                'pay_schedule' => $request->payroll_frequency,
+                'tax_rate' => $request->tax_rate,
                 'processing_day' => $request->processing_day,
-                'default_currency' => $request->default_currency,
-                'overtime_calculation' => $request->overtime_calculation,
-                'nssf_employer_rate' => $request->nssf_employer_rate,
-                'nssf_employee_rate' => $request->nssf_employee_rate,
-                'nhif_calculation_method' => $request->nhif_calculation_method,
-                'paye_tax_free' => $request->paye_tax_free,
+                'default_currency' => $request->currency,
             ];
 
-            cache()->put('payroll_settings', $settings, now()->addDays(30));
+            foreach ($settingsData as $key => $value) {
+                Setting::updateOrCreate(
+                    ['key' => $key],
+                    [
+                        'value' => $value,
+                        'type' => $this->getSettingType($value),
+                        'category' => 'payroll',
+                        'description' => $this->getSettingDescription($key),
+                        'updated_by' => Auth::id(),
+                    ]
+                );
+            }
 
             Log::info('Payroll settings updated', ['user_id' => Auth::id()]);
             return redirect()->route('settings.index')->with('success', 'Payroll configuration updated successfully.');
@@ -172,15 +155,33 @@ class SettingController extends Controller
         }
     }
 
-    /**
-     * Store a new allowance
-     */
+    private function getSettingType($value)
+    {
+        if (is_int($value)) return 'integer';
+        if (is_float($value)) return 'decimal';
+        if (is_bool($value)) return 'boolean';
+        if (is_array($value)) return 'array';
+        return 'string';
+    }
+
+    private function getSettingDescription($key)
+    {
+        $descriptions = [
+            'pay_schedule' => 'Payroll processing schedule',
+            'tax_rate' => 'Default tax rate (%)',
+            'processing_day' => 'Day of month for payroll processing',
+            'default_currency' => 'Default currency for payroll',
+        ];
+
+        return $descriptions[$key] ?? 'System setting';
+    }
+
     public function storeAllowance(Request $request)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:allowance,name',
             'type' => 'required|in:fixed,percentage',
             'amount' => 'required|numeric|min:0' . ($request->type === 'percentage' ? '|max:100' : ''),
             'taxable' => 'boolean',
@@ -207,18 +208,18 @@ class SettingController extends Controller
         }
     }
 
-    /**
-     * Update an allowance
-     */
-    public function updateAllowance(Request $request, Allowance $allowance)
+    public function updateAllowance(Request $request, $id)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
+        $allowance = Allowance::findOrFail($id);
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:allowance,name,' . $allowance->id,
             'type' => 'required|in:fixed,percentage',
             'amount' => 'required|numeric|min:0' . ($request->type === 'percentage' ? '|max:100' : ''),
             'taxable' => 'boolean',
+            'active' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -231,6 +232,7 @@ class SettingController extends Controller
                 'type' => $request->type,
                 'amount' => $request->amount,
                 'taxable' => $request->boolean('taxable', false),
+                'active' => $request->boolean('active', true),
             ]);
 
             Log::info('Allowance updated', ['id' => $allowance->id, 'user_id' => Auth::id()]);
@@ -241,14 +243,20 @@ class SettingController extends Controller
         }
     }
 
-    /**
-     * Delete an allowance
-     */
-    public function destroyAllowance(Allowance $allowance)
+    public function destroyAllowance($id)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
         try {
+            $allowance = Allowance::findOrFail($id);
+            
+            // Check if allowance is used by any employee before deleting
+            $isUsed = DB::table('employee_allowance')->where('allowance_id', $id)->exists();
+            
+            if ($isUsed) {
+                return redirect()->back()->with('error', 'Cannot delete allowance. It is currently assigned to employees.');
+            }
+            
             $allowance->delete();
 
             Log::info('Allowance deleted', ['id' => $allowance->id, 'user_id' => Auth::id()]);
@@ -259,15 +267,12 @@ class SettingController extends Controller
         }
     }
 
-    /**
-     * Store a new deduction
-     */
     public function storeDeduction(Request $request)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:deductions,name',
             'category' => 'required|in:statutory,voluntary',
             'type' => 'required|in:fixed,percentage',
             'amount' => 'required|numeric|min:0' . ($request->type === 'percentage' ? '|max:100' : ''),
@@ -294,18 +299,18 @@ class SettingController extends Controller
         }
     }
 
-    /**
-     * Update a deduction
-     */
-    public function updateDeduction(Request $request, Deduction $deduction)
+    public function updateDeduction(Request $request, $id)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
+        $deduction = Deduction::findOrFail($id);
+
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:deductions,name,' . $deduction->id,
             'category' => 'required|in:statutory,voluntary',
             'type' => 'required|in:fixed,percentage',
             'amount' => 'required|numeric|min:0' . ($request->type === 'percentage' ? '|max:100' : ''),
+            'active' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -318,6 +323,7 @@ class SettingController extends Controller
                 'category' => $request->category,
                 'type' => $request->type,
                 'amount' => $request->amount,
+                'active' => $request->boolean('active', true),
             ]);
 
             Log::info('Deduction updated', ['id' => $deduction->id, 'user_id' => Auth::id()]);
@@ -328,14 +334,20 @@ class SettingController extends Controller
         }
     }
 
-    /**
-     * Delete a deduction
-     */
-    public function destroyDeduction(Deduction $deduction)
+    public function destroyDeduction($id)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
         try {
+            $deduction = Deduction::findOrFail($id);
+            
+            // Check if deduction is used by any employee before deleting
+            $isUsed = DB::table('employee_deduction')->where('deduction_id', $id)->exists();
+            
+            if ($isUsed) {
+                return redirect()->back()->with('error', 'Cannot delete deduction. It is currently assigned to employees.');
+            }
+            
             $deduction->delete();
 
             Log::info('Deduction deleted', ['id' => $deduction->id, 'user_id' => Auth::id()]);
@@ -346,87 +358,46 @@ class SettingController extends Controller
         }
     }
 
-    /**
-     * Update notification settings
-     */
-    public function updateNotifications(Request $request)
+    public function toggleAllowance($id)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
-        $validator = Validator::make($request->all(), [
-            'email_notifications' => 'array',
-            'email_notifications.*' => 'in:payroll_processing,payment_confirmation,contract_expiry,tax_filing',
-            'sms_enabled' => 'boolean',
-            'sms_gateway' => 'required_if:sms_enabled,1|in:twilio,africas_talking,custom',
-            'sms_balance_alert' => 'required_if:sms_enabled,1|numeric|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
-
         try {
-            $settings = [
-                'email_notifications' => $request->email_notifications ?? [],
-                'sms_enabled' => $request->boolean('sms_enabled', false),
-                'sms_gateway' => $request->sms_enabled ? $request->sms_gateway : null,
-                'sms_balance_alert' => $request->sms_enabled ? $request->sms_balance_alert : null,
-            ];
+            $allowance = Allowance::findOrFail($id);
+            $allowance->update([
+                'active' => !$allowance->active
+            ]);
 
-            cache()->put('notification_settings', $settings, now()->addDays(30));
-
-            Log::info('Notification settings updated', ['user_id' => Auth::id()]);
-            return redirect()->route('settings.index')->with('success', 'Notification settings updated successfully.');
+            $status = $allowance->active ? 'activated' : 'deactivated';
+            Log::info('Allowance status toggled', ['id' => $allowance->id, 'status' => $status, 'user_id' => Auth::id()]);
+            
+            return redirect()->route('settings.index')->with('success', "Allowance {$status} successfully.");
         } catch (\Exception $e) {
-            Log::error('Notification settings update failed: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to update notification settings: ' . $e->getMessage());
+            Log::error('Allowance toggle failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to update allowance status.');
         }
     }
 
-    /**
-     * Update integration settings
-     */
-    public function updateIntegrations(Request $request)
+    public function toggleDeduction($id)
     {
         $this->authorizeRole(['admin', 'hr manager']);
 
-        $validator = Validator::make($request->all(), [
-            'accounting_software' => 'nullable|in:quickbooks,xero,sage',
-            'api_key' => 'nullable|string|max:255',
-            'bank_api' => 'nullable|in:swift,custom',
-            'bank_endpoint' => 'nullable|url',
-            'attendance_sync' => 'boolean',
-            'sync_frequency' => 'required_if:attendance_sync,1|in:daily,weekly,monthly',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
-
         try {
-            $settings = [
-                'accounting_software' => $request->accounting_software,
-                'api_key' => $request->api_key,
-                'bank_api' => $request->bank_api,
-                'bank_endpoint' => $request->bank_endpoint,
-                'attendance_sync' => $request->boolean('attendance_sync', false),
-                'sync_frequency' => $request->attendance_sync ? $request->sync_frequency : null,
-                'last_sync' => $request->attendance_sync ? now()->toDateTimeString() : 'Never',
-            ];
+            $deduction = Deduction::findOrFail($id);
+            $deduction->update([
+                'active' => !$deduction->active
+            ]);
 
-            cache()->put('integration_settings', $settings, now()->addDays(30));
-
-            Log::info('Integration settings updated', ['user_id' => Auth::id()]);
-            return redirect()->route('settings.index')->with('success', 'Integration settings updated successfully.');
+            $status = $deduction->active ? 'activated' : 'deactivated';
+            Log::info('Deduction status toggled', ['id' => $deduction->id, 'status' => $status, 'user_id' => Auth::id()]);
+            
+            return redirect()->route('settings.index')->with('success', "Deduction {$status} successfully.");
         } catch (\Exception $e) {
-            Log::error('Integration settings update failed: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to update integration settings: ' . $e->getMessage());
+            Log::error('Deduction toggle failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to update deduction status.');
         }
     }
 
-    /**
-     * Authorize role check
-     */
     private function authorizeRole($roles)
     {
         $user = Auth::user();

@@ -12,7 +12,7 @@
 @endsection
 
 @section('header-subtitle')
-    <span class="text-gray-600">Generate and manage payroll and compliance reports for {{ $settings['company_name'] ?? 'Your Company' }}.</span>
+    <span class="text-gray-600">Generate and manage payroll and compliance reports for {{ $settings->company_name ?? 'Your Company' }}.</span>
 @endsection
 
 @section('content')
@@ -83,7 +83,7 @@
                             @php
                                 $formatColors = [
                                     'pdf' => 'bg-purple-100 text-purple-800',
-                                    'excel' => 'bg-green-100 text-green-800'
+                                    'csv' => 'bg-green-100 text-green-800'
                                 ];
                                 $formatColor = $formatColors[strtolower($report->export_format ?? 'pdf')] ?? 'bg-gray-100 text-gray-800';
                                 $statusColors = [
@@ -131,9 +131,11 @@
                                                 <i class="fas fa-download text-sm"></i>
                                             </span>
                                         @endif
+                                        @if($isAdminOrHR)
                                         <button onclick="openDeleteModal({{ $report->id }}, '{{ $report->report_id }}')" class="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition-all duration-200" title="Delete Report" aria-label="Delete {{ $report->type }} report">
                                             <i class="fas fa-trash-alt text-sm"></i>
                                         </button>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -241,6 +243,7 @@
                         <select name="report_type" id="report_type" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900">
                             <option value="">Select a report type</option>
                             <option value="payslip">Payslip</option>
+                            @if($isAdminOrHR)
                             <option value="payroll_summary">Payroll Summary</option>
                             <option value="tax_report">Tax Report</option>
                             <option value="nssf_report">NSSF Report</option>
@@ -248,6 +251,7 @@
                             <option value="wcf_report">WCF Report</option>
                             <option value="sdl_report">SDL Report</option>
                             <option value="year_end_summary">Year-End Summary</option>
+                            @endif
                         </select>
                         <span class="text-red-500 text-xs mt-1 hidden" id="reportTypeError">Report Type is required</span>
                         @error('report_type')
@@ -278,7 +282,7 @@
                         <label for="export_format" class="block text-gray-600 text-sm font-medium mb-2">Export Format</label>
                         <select name="export_format" id="export_format" required class="bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 block w-full py-2.5 px-3 leading-6 transition-all duration-200 text-gray-900">
                             <option value="pdf">PDF</option>
-                            <option value="excel">Excel</option>
+                            <option value="csv">CSV</option>
                         </select>
                         <span class="text-red-500 text-xs mt-1 hidden" id="exportFormatError">Export Format is required</span>
                         @error('export_format')
@@ -300,6 +304,7 @@
     </div>
 
     <!-- Delete Report Modal -->
+    @if($isAdminOrHR)
     <div id="deleteReportModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50" aria-hidden="true">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content" role="dialog" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalDesc">
             <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100">
@@ -331,6 +336,7 @@
             </div>
         </div>
     </div>
+    @endif
 
 @endsection
 
@@ -525,5 +531,3 @@
         });
     });
 </script>
-
-
