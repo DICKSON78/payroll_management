@@ -18,6 +18,14 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
+// PhpSpreadsheet imports
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Color;
+
 class ReportController extends Controller
 {
     private const REPORT_TYPES = [
@@ -33,7 +41,7 @@ class ReportController extends Controller
         'leave_report', 'compliance_report'
     ];
 
-    private const EXPORT_FORMATS = ['pdf', 'csv'];
+    private const EXPORT_FORMATS = ['pdf', 'excel', 'csv'];
     private const STORAGE_DISK = 'public';
     private const REPORTS_PATH = 'reports';
 
@@ -253,27 +261,8 @@ class ReportController extends Controller
             $filename = "{$report->report_id}_{$report->type}_{$report->period}";
             $filePath = self::REPORTS_PATH . '/' . $filename;
 
-            if ($exportFormat === 'pdf') {
-                $view = $this->getBatchReportView($reportType);
-
-                $pdf = Pdf::loadView($view, $reportData)
-                    ->setPaper('a4', 'landscape')
-                    ->setOptions([
-                        'isHtml5ParserEnabled' => true,
-                        'isRemoteEnabled' => false,
-                        'isPhpEnabled' => false,
-                        'dpi' => 72,
-                        'defaultFont' => 'helvetica',
-                        'chroot' => base_path(),
-                        'fontHeightRatio' => 0.9,
-                        'isFontSubsettingEnabled' => true,
-                    ]);
-
-                Storage::disk(self::STORAGE_DISK)->put($filePath . '.pdf', $pdf->output());
-            } else {
-                $csvData = $this->generateCsvData($reportData, $reportType);
-                Storage::disk(self::STORAGE_DISK)->put($filePath . '.csv', $csvData);
-            }
+            // Use the new save method
+            $this->saveReportFile($filePath, $exportFormat, $reportData, $reportType);
 
             $report->update(['status' => 'completed']);
 
@@ -291,7 +280,7 @@ class ReportController extends Controller
                     $report->update(['status' => 'completed', 'export_format' => 'csv']);
 
                     return redirect()->route('reports')
-                        ->with('warning', "Report generated as CSV due to PDF issues: " . $e->getMessage());
+                        ->with('warning', "Report generated as CSV due to PDF/Excel issues: " . $e->getMessage());
                 } catch (\Exception $csvError) {
                     Log::error('CSV fallback also failed: ' . $csvError->getMessage());
                 }
@@ -333,21 +322,8 @@ class ReportController extends Controller
                     $filename = "{$report->report_id}_{$report->type}_{$report->period}";
                     $filePath = self::REPORTS_PATH . '/' . $filename;
 
-                    if ($exportFormat === 'pdf') {
-                        $view = $this->getIndividualReportView('payslip');
-                        $pdf = Pdf::loadView($view, $reportData)
-                            ->setOptions([
-                                'isHtml5ParserEnabled' => true,
-                                'isRemoteEnabled' => true,
-                                'isPhpEnabled' => false,
-                                'dpi' => 96,
-                                'defaultFont' => 'dejavu sans',
-                            ]);
-                        Storage::disk(self::STORAGE_DISK)->put($filePath . '.pdf', $pdf->output());
-                    } else {
-                        $csvData = $this->generateCsvData($reportData, 'payslip');
-                        Storage::disk(self::STORAGE_DISK)->put($filePath . '.csv', $csvData);
-                    }
+                    // Use the new save method
+                    $this->saveReportFile($filePath, $exportFormat, $reportData, 'payslip');
 
                     $report->update(['status' => 'completed']);
                     $generatedCount++;
@@ -401,32 +377,8 @@ class ReportController extends Controller
             $filename = "{$report->report_id}_{$report->type}_{$report->period}";
             $filePath = self::REPORTS_PATH . '/' . $filename;
 
-            if ($exportFormat === 'pdf') {
-                try {
-                    $view = $this->getIndividualReportView($reportType);
-
-                    $pdf = Pdf::loadView($view, $reportData)
-                        ->setOptions([
-                            'isHtml5ParserEnabled' => true,
-                            'isRemoteEnabled' => true,
-                            'isPhpEnabled' => false,
-                            'dpi' => 96,
-                            'defaultFont' => 'dejavu sans',
-                            'chroot' => base_path(),
-                        ]);
-
-                    Storage::disk(self::STORAGE_DISK)->put($filePath . '.pdf', $pdf->output());
-
-                } catch (\Exception $e) {
-                    \Log::error('PDF Generation Error: ' . $e->getMessage());
-                    // Fallback kwa CSV kama PDF inakataa
-                    $csvData = $this->generateCsvData($reportData, $reportType);
-                    Storage::disk(self::STORAGE_DISK)->put($filePath . '.csv', $csvData);
-                }
-            } else {
-                $csvData = $this->generateCsvData($reportData, $reportType);
-                Storage::disk(self::STORAGE_DISK)->put($filePath . '.csv', $csvData);
-            }
+            // Use the new save method
+            $this->saveReportFile($filePath, $exportFormat, $reportData, $reportType);
 
             $report->update(['status' => 'completed']);
 
@@ -443,7 +395,431 @@ class ReportController extends Controller
     }
 
     /**
-     * Get Batch Report Data (For Admin/HR Reports)
+     * Save Report File based on format
+     */
+    private function saveReportFile($filePath, $exportFormat, $reportData, $reportType)
+    {
+        if ($exportFormat === 'pdf') {
+            try {
+                $view = $this->getBatchReportView($reportType);
+                $pdf = Pdf::loadView($view, $reportData)
+                    ->setPaper('a4', 'landscape')
+                    ->setOptions([
+                        'isHtml5ParserEnabled' => true,
+                        'isRemoteEnabled' => false,
+                        'isPhpEnabled' => false,
+                        'dpi' => 72,
+                        'defaultFont' => 'helvetica',
+                    ]);
+                Storage::disk(self::STORAGE_DISK)->put($filePath . '.pdf', $pdf->output());
+            } catch (\Exception $e) {
+                Log::error('PDF generation failed: ' . $e->getMessage());
+                throw $e;
+            }
+        } elseif ($exportFormat === 'excel') {
+            try {
+                $excelData = $this->generateExcelData($reportData, $reportType);
+                Storage::disk(self::STORAGE_DISK)->put($filePath . '.xlsx', $excelData);
+            } catch (\Exception $e) {
+                Log::error('Excel generation failed: ' . $e->getMessage());
+                throw $e;
+            }
+        } else {
+            $csvData = $this->generateCsvData($reportData, $reportType);
+            Storage::disk(self::STORAGE_DISK)->put($filePath . '.csv', $csvData);
+        }
+    }
+
+    /**
+     * Generate Excel Data with Styling
+     */
+    private function generateExcelData($reportData, $reportType)
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        if ($reportType === 'payroll_summary') {
+            $this->generatePayrollSummaryExcel($sheet, $reportData);
+        } elseif ($reportType === 'year_end_summary') {
+            $this->generateYearEndSummaryExcel($sheet, $reportData);
+        } elseif ($reportType === 'tax_report') {
+            $this->generateTaxReportExcel($sheet, $reportData);
+        } elseif ($reportType === 'nssf_report') {
+            $this->generateNSSFReportExcel($sheet, $reportData);
+        } elseif ($reportType === 'nhif_report') {
+            $this->generateNHIFReportExcel($sheet, $reportData);
+        } else {
+            // Default Excel generation for other reports
+            $this->generateDefaultExcel($sheet, $reportData, $reportType);
+        }
+
+        // Create writer and save to temporary file
+        $writer = new Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'excel_report') . '.xlsx';
+        $writer->save($tempFile);
+
+        // Read and return file contents
+        $content = file_get_contents($tempFile);
+        unlink($tempFile); // Clean up temporary file
+
+        return $content;
+    }
+
+    /**
+     * Generate Payroll Summary Excel with Styling
+     */
+    private function generatePayrollSummaryExcel($sheet, $reportData)
+    {
+        // Headers - Rangi ya kijani, katikati
+        $headers = [
+            'NA.', 'JINA LA MFANYAKAZI', 'CHEO', 'BASIC SALARY AS PER CONTRACT', 
+            'ALLOWANCE', 'GROSS SALARY', 'MWANZO WA KUAJIRIWA', 'MWISHO WA MKATABA', 
+            '', 'BASIC/SALARY', 'NSSF', 'PAYEE', 'BIMA', 'BODI MIKOPO', 
+            'TUICO', 'MADENI NAFSIA', 'TAKE HOME', 'AKAUNTI'
+        ];
+
+        $row = 1;
+        
+        // Apply header styling - Kijani, katikati
+        foreach ($headers as $col => $header) {
+            $cell = $this->getExcelColumn($col) . $row;
+            $sheet->setCellValue($cell, $header);
+            
+            // Styling ya header
+            $sheet->getStyle($cell)->applyFromArray([
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '00FF00'] // Kijani
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => '000000'] // Nyeusi
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => '000000']
+                    ]
+                ]
+            ]);
+        }
+
+        // Data rows
+        $row = 2;
+        foreach ($reportData['employees'] as $employee) {
+            $data = [
+                $employee['na'],
+                $employee['name'],
+                $employee['position'],
+                $employee['basic_salary'],
+                $employee['allowance'],
+                $employee['gross_salary'],
+                $employee['start_date'],
+                $employee['end_date'],
+                '', // Empty column
+                $employee['basic_salary_display'],
+                $employee['nssf'],
+                $employee['payee'],
+                $employee['bima'],
+                $employee['bodi_mikopo'],
+                $employee['tuico'],
+                $employee['madeni_nafsia'],
+                $employee['take_home'],
+                $employee['account']
+            ];
+            
+            foreach ($data as $col => $value) {
+                $cell = $this->getExcelColumn($col) . $row;
+                $sheet->setCellValue($cell, $value);
+                
+                // Styling ya data - alignment left kwa text, right kwa numbers
+                $alignment = is_numeric($value) ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_LEFT;
+                $sheet->getStyle($cell)->getAlignment()->setHorizontal($alignment);
+                
+                // Add borders to data cells
+                $sheet->getStyle($cell)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            }
+            $row++;
+        }
+
+        // Total row - Rangi ya njano, katikati
+        $totals = $reportData['totals'];
+        $totalData = [
+            'TOTAL', '', '', 
+            $totals['total_basic_salary'], 
+            $totals['total_allowance'], 
+            $totals['total_gross_salary'],
+            '', '', '',
+            $totals['total_nssf'],
+            $totals['total_payee'],
+            $totals['total_bima'],
+            $totals['total_bodi_mikopo'],
+            $totals['total_tuico'],
+            $totals['total_madeni_nafsia'],
+            $totals['total_take_home'],
+            $totals['employee_count'] . ' Wafanyakazi'
+        ];
+        
+        foreach ($totalData as $col => $value) {
+            $cell = $this->getExcelColumn($col) . $row;
+            $sheet->setCellValue($cell, $value);
+            
+            // Styling ya total row - Njano, katikati
+            $sheet->getStyle($cell)->applyFromArray([
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FFFF00'] // Njano
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+                'font' => [
+                    'bold' => true
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN,
+                        'color' => ['rgb' => '000000']
+                    ]
+                ]
+            ]);
+        }
+
+        // Auto-size columns
+        foreach (range('A', $this->getExcelColumn(count($headers) - 1)) as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+    }
+
+    /**
+     * Generate Year End Summary Excel with Styling
+     */
+    private function generateYearEndSummaryExcel($sheet, $reportData)
+    {
+        $currentRow = 1;
+
+        // Title - Kijani, katikati
+        $sheet->mergeCells("A:Q");
+        $sheet->setCellValue('A' . $currentRow, "RIPOTI YA MWISHO WA MWAKA - {$reportData['year']}");
+        $sheet->getStyle('A' . $currentRow)->applyFromArray([
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '00FF00']
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+            'font' => [
+                'bold' => true,
+                'size' => 14
+            ]
+        ]);
+        $currentRow += 2;
+
+        // Michango ya Wafanyakazi header - Kijani, katikati
+        $sheet->mergeCells("A:O");
+        $sheet->setCellValue('A' . $currentRow, "MICHANGO YA WAFANYAKAZI");
+        $sheet->getStyle('A' . $currentRow)->applyFromArray([
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '00FF00']
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+            ],
+            'font' => [
+                'bold' => true
+            ]
+        ]);
+        $currentRow++;
+
+        // Column headers - Kijani, katikati
+        $headers = [
+            'NA.', 'JINA LA MFANYAKAZI', 'CHEO', 'NSSF NO.', 'TIN NO.', 
+            'MIEZI ILIYOFANYA KAZI', 'MSHAHARA MSINGI', 'ALLOWANCE', 
+            'MSHAHARA JUMLA', 'NSSF', 'NHIF', 'PAYEE', 'MADENI NAFSIA', 
+            'TAKE HOME', 'AKAUNTI'
+        ];
+
+        foreach ($headers as $col => $header) {
+            $cell = $this->getExcelColumn($col) . $currentRow;
+            $sheet->setCellValue($cell, $header);
+            $sheet->getStyle($cell)->applyFromArray([
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '00FF00']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                ],
+                'font' => [
+                    'bold' => true
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN
+                    ]
+                ]
+            ]);
+        }
+        $currentRow++;
+
+        // Data rows
+        foreach ($reportData['employees'] as $employee) {
+            $data = [
+                $employee['na'],
+                $employee['name'],
+                $employee['position'],
+                $employee['nssf_number'],
+                $employee['tin_number'],
+                $employee['months_worked'],
+                $employee['total_basic_salary'],
+                $employee['total_allowances'],
+                $employee['total_gross_salary'],
+                $employee['total_nssf'],
+                $employee['total_nhif'],
+                $employee['total_payee'],
+                $employee['total_other_deductions'],
+                $employee['total_net_salary'],
+                $employee['account']
+            ];
+            
+            foreach ($data as $col => $value) {
+                $cell = $this->getExcelColumn($col) . $currentRow;
+                $sheet->setCellValue($cell, $value);
+                
+                $alignment = is_numeric($value) ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_LEFT;
+                $sheet->getStyle($cell)->getAlignment()->setHorizontal($alignment);
+                $sheet->getStyle($cell)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            }
+            $currentRow++;
+        }
+
+        // Total row - Njano, katikati
+        $totals = $reportData['totals'];
+        $totalData = [
+            'JUMLA', '', '', '', '',
+            $totals['total_months_worked'],
+            $totals['total_basic_salary'],
+            $totals['total_allowances'],
+            $totals['total_gross_salary'],
+            $totals['total_nssf'],
+            $totals['total_nhif'],
+            $totals['total_payee'],
+            $totals['total_other_deductions'],
+            $totals['total_net_salary'],
+            $totals['employee_count'] . ' Wafanyakazi'
+        ];
+        
+        foreach ($totalData as $col => $value) {
+            $cell = $this->getExcelColumn($col) . $currentRow;
+            $sheet->setCellValue($cell, $value);
+            $sheet->getStyle($cell)->applyFromArray([
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'FFFF00']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                ],
+                'font' => [
+                    'bold' => true
+                ],
+                'borders' => [
+                    'allBorders' => [
+                        'borderStyle' => Border::BORDER_THIN
+                    ]
+                ]
+            ]);
+        }
+
+        // Auto-size columns
+        foreach (range('A', $this->getExcelColumn(count($headers) - 1)) as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+    }
+
+    /**
+     * Generate Tax Report Excel
+     */
+    private function generateTaxReportExcel($sheet, $reportData)
+    {
+        // Implementation for Tax Report Excel
+        $headers = ['Employee Name', 'Employee ID', 'Position', 'Gross Salary', 'Tax Amount', 'NSSF Number', 'TIN Number'];
+        
+        $row = 1;
+        foreach ($headers as $col => $header) {
+            $cell = $this->getExcelColumn($col) . $row;
+            $sheet->setCellValue($cell, $header);
+            $sheet->getStyle($cell)->applyFromArray([
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '00FF00']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                'font' => ['bold' => true],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]]
+            ]);
+        }
+
+        // Add data and totals...
+    }
+
+    /**
+     * Generate NSSF Report Excel
+     */
+    private function generateNSSFReportExcel($sheet, $reportData)
+    {
+        // Similar implementation for NSSF Report
+    }
+
+    /**
+     * Generate NHIF Report Excel
+     */
+    private function generateNHIFReportExcel($sheet, $reportData)
+    {
+        // Similar implementation for NHIF Report
+    }
+
+    /**
+     * Generate Default Excel for other reports
+     */
+    private function generateDefaultExcel($sheet, $reportData, $reportType)
+    {
+        $headers = ['Column 1', 'Column 2', 'Column 3']; // Adjust as needed
+        
+        $row = 1;
+        foreach ($headers as $col => $header) {
+            $cell = $this->getExcelColumn($col) . $row;
+            $sheet->setCellValue($cell, $header);
+            $sheet->getStyle($cell)->applyFromArray([
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '00FF00']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+                'font' => ['bold' => true],
+            ]);
+        }
+
+        // Add data rows...
+    }
+
+    /**
+     * Helper function to get Excel column letter
+     */
+    private function getExcelColumn($index)
+    {
+        $letters = '';
+        while ($index >= 0) {
+            $letters = chr(65 + ($index % 26)) . $letters;
+            $index = floor($index / 26) - 1;
+        }
+        return $letters;
+    }
+
+    /**
+     * Get Batch Report Data
      */
     private function getBatchReportData($reportType, $period, $batchNumber)
     {
@@ -532,11 +908,10 @@ class ReportController extends Controller
     }
 
     /**
-     * Get Payroll Summary Data - IMEFUNGULIWA KWA JOIN DIRECT
+     * Get Payroll Summary Data
      */
     private function getPayrollSummaryData($period)
     {
-        // Tumia DB join kupata data moja kwa moja
         $payrollData = DB::table('payrolls')
             ->join('employees', 'payrolls.employee_id', '=', 'employees.employee_id')
             ->where('payrolls.period', $period)
@@ -545,7 +920,9 @@ class ReportController extends Controller
                 'payrolls.*',
                 'employees.position',
                 'employees.account_number',
-                'employees.name as employee_name'
+                'employees.name as employee_name',
+                'employees.hire_date',
+                'employees.contract_end_date'
             )
             ->get();
 
@@ -565,14 +942,15 @@ class ReportController extends Controller
         ];
 
         foreach ($payrollData as $index => $payroll) {
-            // Calculate statutory deductions
             $grossSalary = $payroll->total_amount;
             $nssf = $this->calculateNSSF($grossSalary);
             $nhif = $this->calculateNHIF($grossSalary);
             $payee = $this->calculatePAYE($grossSalary, $nssf);
             $otherDeductions = max(0, $payroll->deductions - ($nssf + $nhif + $payee));
 
-            // SASA IMEWAKA - data halisi kutoka database
+            $startDate = $payroll->hire_date ? Carbon::parse($payroll->hire_date)->format('Y-m-d H:i:s') : '';
+            $endDate = $payroll->contract_end_date ? Carbon::parse($payroll->contract_end_date)->format('Y-m-d H:i:s') : '';
+
             $employeeData[] = [
                 'na' => $index + 1,
                 'name' => $payroll->employee_name,
@@ -580,6 +958,9 @@ class ReportController extends Controller
                 'basic_salary' => $payroll->base_salary,
                 'allowance' => $payroll->allowances ?? 0,
                 'gross_salary' => $grossSalary,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'basic_salary_display' => $payroll->base_salary,
                 'nssf' => $nssf,
                 'payee' => $payee,
                 'bima' => $nhif,
@@ -590,7 +971,6 @@ class ReportController extends Controller
                 'account' => $payroll->account_number ?? 'N/A'
             ];
 
-            // Update totals
             $totals['total_basic_salary'] += $payroll->base_salary;
             $totals['total_allowance'] += $payroll->allowances ?? 0;
             $totals['total_gross_salary'] += $grossSalary;
@@ -757,11 +1137,10 @@ class ReportController extends Controller
     }
 
     /**
-     * Get Year End Summary Data - Jumla ya mwaka mzima
+     * Get Year End Summary Data
      */
     private function getYearEndSummaryData($year)
     {
-        // Pata payrolls zote za mwaka husika
         $payrollData = DB::table('payrolls')
             ->join('employees', 'payrolls.employee_id', '=', 'employees.employee_id')
             ->whereYear('payrolls.created_at', $year)
@@ -777,7 +1156,6 @@ class ReportController extends Controller
             )
             ->get();
 
-        // Group data kwa kila mfanyakazi
         $employeeYearlyData = [];
         
         foreach ($payrollData as $payroll) {
@@ -808,7 +1186,6 @@ class ReportController extends Controller
                 ];
             }
 
-            // Calculate statutory deductions for each payroll
             $grossSalary = $payroll->total_amount;
             $nssf = $this->calculateNSSF($grossSalary);
             $nhif = $this->calculateNHIF($grossSalary);
@@ -818,7 +1195,6 @@ class ReportController extends Controller
             $employerWCF = $this->calculateWCF($grossSalary);
             $employerSDL = $this->calculateSDL($grossSalary);
 
-            // Accumulate totals
             $employeeYearlyData[$employeeId]['total_basic_salary'] += $payroll->base_salary;
             $employeeYearlyData[$employeeId]['total_allowances'] += $payroll->allowances ?? 0;
             $employeeYearlyData[$employeeId]['total_gross_salary'] += $grossSalary;
@@ -833,7 +1209,6 @@ class ReportController extends Controller
             $employeeYearlyData[$employeeId]['months_worked']++;
         }
 
-        // Convert to array for template
         $employeeData = [];
         $grandTotals = [
             'total_basic_salary' => 0,
@@ -878,7 +1253,6 @@ class ReportController extends Controller
                 'account' => $data['employee']['account_number']
             ];
 
-            // Accumulate grand totals
             $grandTotals['total_basic_salary'] += $data['total_basic_salary'];
             $grandTotals['total_allowances'] += $data['total_allowances'];
             $grandTotals['total_gross_salary'] += $data['total_gross_salary'];
@@ -904,11 +1278,10 @@ class ReportController extends Controller
     // ========== KANUNI ZA TANZANIA ZA HESABU ==========
 
     /**
-     * Calculate NSSF Contribution (Employee) - Kulingana na sheria za Tanzania
+     * Calculate NSSF Contribution (Employee)
      */
     private function calculateNSSF($grossSalary)
     {
-        // NSSF inalipwa kwa mshahara hadi TZS 2,000,000 kwa kiwango cha 10%
         $nssfBase = min($grossSalary, self::NSSF_LIMIT);
         return $nssfBase * self::NSSF_RATE_EMPLOYEE;
     }
@@ -923,7 +1296,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Calculate NHIF Contribution - Kulingana na kanuni za Tanzania
+     * Calculate NHIF Contribution
      */
     private function calculateNHIF($salary)
     {
@@ -936,13 +1309,11 @@ class ReportController extends Controller
     }
 
     /**
-     * Calculate PAYE (Pay As You Earn) - Kulingana na vikwazo vya Tanzania
+     * Calculate PAYE (Pay As You Earn)
      */
     private function calculatePAYE($grossSalary, $nssfDeduction)
     {
-        // Taxable income = Gross Salary - NSSF
         $taxableIncome = $grossSalary - $nssfDeduction;
-
         $tax = 0;
         $previousLimit = 0;
 
@@ -958,7 +1329,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Calculate WCF (Workers Compensation Fund) - Employer pays
+     * Calculate WCF (Workers Compensation Fund)
      */
     private function calculateWCF($grossSalary)
     {
@@ -966,7 +1337,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Calculate SDL (Skills Development Levy) - Employer pays
+     * Calculate SDL (Skills Development Levy)
      */
     private function calculateSDL($grossSalary)
     {
@@ -999,15 +1370,14 @@ class ReportController extends Controller
     }
 
     /**
-     * Generate CSV Data - Kulingana na schema ya PDF
+     * Generate CSV Data
      */
     private function generateCsvData($reportData, $reportType)
     {
         $csv = "";
 
         if ($reportType === 'payroll_summary') {
-            // Headers kama kwenye PDF yako
-            $csv .= "NA.,JINA LA MFANYAKAZI,CHEO,BASIC SALARY,ALLOWANCE,GROSS SALARY,NSSF,PAYEE,BIMA,BODI MIKOPO,TUICO,MADENI NAFSIA,TAKE HOME,AKAUNTI\n";
+            $csv .= "NA.,JINA LA MFANYAKAZI,CHEO,BASIC SALARY AS PER CONTRACT,ALLOWANCE,GROSS SALARY,MWANZO WA KUAJIRIWA,MWISHO WA MKATABA,,BASIC/SALARY,NSSF,PAYEE,BIMA,BODI MIKOPO,TUICO,MADENI NAFSIA,TAKE HOME,AKAUNTI\n";
 
             foreach ($reportData['employees'] as $employee) {
                 $csv .= "{$employee['na']},";
@@ -1016,6 +1386,10 @@ class ReportController extends Controller
                 $csv .= "{$employee['basic_salary']},";
                 $csv .= "{$employee['allowance']},";
                 $csv .= "{$employee['gross_salary']},";
+                $csv .= "\"{$employee['start_date']}\",";
+                $csv .= "\"{$employee['end_date']}\",";
+                $csv .= ",";
+                $csv .= "{$employee['basic_salary_display']},";
                 $csv .= "{$employee['nssf']},";
                 $csv .= "{$employee['payee']},";
                 $csv .= "{$employee['bima']},";
@@ -1026,15 +1400,13 @@ class ReportController extends Controller
                 $csv .= "\"{$employee['account']}\"\n";
             }
 
-            // Add totals row
             $totals = $reportData['totals'];
             $csv .= "TOTAL,,,{$totals['total_basic_salary']},{$totals['total_allowance']},{$totals['total_gross_salary']},{$totals['total_nssf']},{$totals['total_payee']},{$totals['total_bima']},{$totals['total_bodi_mikopo']},{$totals['total_tuico']},{$totals['total_madeni_nafsia']},{$totals['total_take_home']},{$totals['employee_count']} Wafanyakazi\n";
-        }
-        elseif ($reportType === 'year_end_summary') {
-            // Employee Contributions CSV
+
+        } elseif ($reportType === 'year_end_summary') {
             $csv .= "RIPOTI YA MWISHO WA MWAKA - {$reportData['year']}\n\n";
             $csv .= "MICHANGO YA WAFANYAKAZI\n";
-            $csv .= "NA.,JINA LA MFANYAKAZI,CHEO,NSSF NO.,TIN NO.,MIEZI,MSHAHARA MSINGI,ALLOWANCE,MSHAHARA JUMLA,NSSF,NHIF,PAYEE,MADENI NAFSIA,TAKE HOME,AKAUNTI\n";
+            $csv .= "NA.,JINA LA MFANYAKAZI,CHEO,NSSF NO.,TIN NO.,MIEZI ILIYOFANYA KAZI,MSHAHARA MSINGI,ALLOWANCE,MSHAHARA JUMLA,NSSF,NHIF,PAYEE,MADENI NAFSIA,TAKE HOME,AKAUNTI\n";
 
             foreach ($reportData['employees'] as $employee) {
                 $csv .= "{$employee['na']},";
@@ -1057,7 +1429,6 @@ class ReportController extends Controller
             $totals = $reportData['totals'];
             $csv .= "JUMLA,,,,{$totals['total_months_worked']},{$totals['total_basic_salary']},{$totals['total_allowances']},{$totals['total_gross_salary']},{$totals['total_nssf']},{$totals['total_nhif']},{$totals['total_payee']},{$totals['total_other_deductions']},{$totals['total_net_salary']},{$totals['employee_count']} Wafanyakazi\n\n";
 
-            // Employer Contributions CSV
             $csv .= "MICHANGO YA MWAJIRI\n";
             $csv .= "NA.,JINA LA MFANYAKAZI,NSSF NO.,MSHAHARA JUMLA,NSSF (MWAJIRI),WCF (MWAJIRI),SDL (MWAJIRI),JUMLA MWAJIRI,JUMLA WOTE,AKAUNTI\n";
 
@@ -1148,20 +1519,18 @@ class ReportController extends Controller
 
         // Ukaguzi wa ruhusa
         if (strtolower($user->role) === 'employee') {
-            // Employee anaweza kudownload payslip yake tu
             if ($report->type !== 'payslip') {
                 abort(403, 'Unauthorized to download this report.');
             }
-
             $employeeId = $user->employee_id ?? $user->employee->employee_id ?? null;
             if ($report->employee_id !== $employeeId) {
                 abort(403, 'Unauthorized to download this report.');
             }
         }
 
-        // Try different file extensions
+        // Try different file extensions including Excel
         $baseFilename = "{$report->report_id}_{$report->type}_{$report->period}";
-        $extensions = ['pdf', 'csv'];
+        $extensions = ['pdf', 'xlsx', 'csv'];
 
         foreach ($extensions as $ext) {
             $filePath = self::REPORTS_PATH . '/' . $baseFilename . '.' . $ext;
@@ -1188,7 +1557,7 @@ class ReportController extends Controller
 
         // Delete associated files
         $baseFilename = "{$report->report_id}_{$report->type}_{$report->period}";
-        $extensions = ['pdf', 'csv'];
+        $extensions = ['pdf', 'xlsx', 'csv'];
 
         foreach ($extensions as $ext) {
             $filePath = self::REPORTS_PATH . '/' . $baseFilename . '.' . $ext;
