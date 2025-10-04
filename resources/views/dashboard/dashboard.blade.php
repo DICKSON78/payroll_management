@@ -81,8 +81,8 @@
                 <i class="fas fa-bolt text-yellow-500 mr-2"></i> Quick Actions
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <!-- Add Employee -->
-                <div class="card bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-6 cursor-pointer quick-action-btn" data-action="quick_add_employee">
+                <!-- Add Employee - CHANGED: Now redirects to employees page with add tab -->
+                <a href="{{ route('employees.index') }}?tab=add" class="card bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-6 cursor-pointer block">
                     <div class="flex items-center">
                         <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
                             <i class="fas fa-user-plus text-blue-600 text-xl"></i>
@@ -92,7 +92,7 @@
                             <p class="text-sm text-gray-500">Register new employee</p>
                         </div>
                     </div>
-                </div>
+                </a>
 
                 <!-- Run Payroll -->
                 <div class="card bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 p-6 cursor-pointer quick-action-btn" data-action="quick_run_payroll">
@@ -181,63 +181,6 @@
     </div>
 
     <!-- MODALS SECTION -->
-
-    <!-- Quick Add Employee Modal -->
-    <div id="quickAddEmployeeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-white rounded-xl w-full max-w-md transform transition-all duration-300 scale-95 modal-content">
-            <div class="p-6 bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-xl font-semibold text-blue-600 flex items-center">
-                        <i class="fas fa-user-plus mr-2"></i> Quick Add Employee
-                    </h3>
-                    <button type="button" onclick="closeModal('quickAddEmployeeModal')" class="text-gray-400 hover:text-gray-500 rounded-md p-1.5 hover:bg-gray-100 transition-all duration-200">
-                        <i class="fas fa-times text-lg"></i>
-                    </button>
-                </div>
-            </div>
-            <form id="quickAddEmployeeForm" method="POST">
-                @csrf
-                <input type="hidden" name="action" value="quick_add_employee">
-                <div class="p-6">
-                    <div class="space-y-4">
-                        <div>
-                            <label for="quick_name" class="block text-gray-600 text-sm font-medium mb-1">Full Name *</label>
-                            <input type="text" id="quick_name" name="name" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-all duration-200" placeholder="John Doe" required>
-                        </div>
-                        <div>
-                            <label for="quick_email" class="block text-gray-600 text-sm font-medium mb-1">Email *</label>
-                            <input type="email" id="quick_email" name="email" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-all duration-200" placeholder="john@company.com" required>
-                        </div>
-                        <div>
-                            <label for="quick_position" class="block text-gray-600 text-sm font-medium mb-1">Position *</label>
-                            <input type="text" id="quick_position" name="position" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-all duration-200" placeholder="Software Developer" required>
-                        </div>
-                        <div>
-                            <label for="quick_department" class="block text-gray-600 text-sm font-medium mb-1">Department *</label>
-                            <select id="quick_department" name="department" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-all duration-200" required>
-                                <option value="">Select Department</option>
-                                @foreach($departments as $department)
-                                    <option value="{{ $department->name }}">{{ $department->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label for="quick_base_salary" class="block text-gray-600 text-sm font-medium mb-1">Base Salary (TZS) *</label>
-                            <input type="number" id="quick_base_salary" name="base_salary" class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-all duration-200" placeholder="500000" required min="0">
-                        </div>
-                    </div>
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 flex items-center" onclick="closeModal('quickAddEmployeeModal')">
-                            <i class="fas fa-times mr-2"></i> Cancel
-                        </button>
-                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center">
-                            <i class="fas fa-check mr-2"></i> Add Employee
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- Quick Run Payroll Modal -->
     <div id="quickRunPayrollModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
@@ -488,13 +431,31 @@
     }
 
     function setupFormHandlers() {
-        // Quick Add Employee Form
+        // Quick Add Employee Form - Full form submission
         const quickAddEmployeeForm = document.getElementById('quickAddEmployeeForm');
         if (quickAddEmployeeForm) {
             quickAddEmployeeForm.addEventListener('submit', function(e) {
                 e.preventDefault();
-                submitQuickActionForm(this);
+                submitQuickAddEmployeeForm(this);
             });
+
+            // Handle employment type change for contract end date
+            const employmentTypeSelect = quickAddEmployeeForm.querySelector('select[name="employment_type"]');
+            const contractEndDateContainer = document.getElementById('quickContractEndDateContainer');
+            
+            if (employmentTypeSelect && contractEndDateContainer) {
+                employmentTypeSelect.addEventListener('change', function() {
+                    if (this.value === 'contract') {
+                        contractEndDateContainer.classList.remove('hidden');
+                        const input = contractEndDateContainer.querySelector('input[name="contract_end_date"]');
+                        if (input) input.setAttribute('required', 'required');
+                    } else {
+                        contractEndDateContainer.classList.add('hidden');
+                        const input = contractEndDateContainer.querySelector('input[name="contract_end_date"]');
+                        if (input) input.removeAttribute('required');
+                    }
+                });
+            }
         }
 
         // Quick Run Payroll Form
@@ -575,7 +536,23 @@
             }
             
             // Initialize specific modal features
-            if (modalId === 'quickRunPayrollModal') {
+            if (modalId === 'quickAddEmployeeModal') {
+                // Reset form and set default values
+                const form = document.getElementById('quickAddEmployeeForm');
+                if (form) {
+                    form.reset();
+                    // Set default hire date to today
+                    const hireDateInput = form.querySelector('input[name="hire_date"]');
+                    if (hireDateInput) {
+                        hireDateInput.value = new Date().toISOString().split('T')[0];
+                    }
+                    // Reset contract end date container
+                    const contractContainer = document.getElementById('quickContractEndDateContainer');
+                    if (contractContainer) {
+                        contractContainer.classList.add('hidden');
+                    }
+                }
+            } else if (modalId === 'quickRunPayrollModal') {
                 initQuickPayrollDatePicker();
                 // Reset employee selection
                 setTimeout(() => {
@@ -660,7 +637,78 @@
         }
     }
 
-    // Quick Action Form Submission
+    // Quick Add Employee Form Submission - Full form
+    function submitQuickAddEmployeeForm(form) {
+        if (isRefreshing) {
+            console.log('⚠️ Already refreshing, skipping duplicate request');
+            return;
+        }
+
+        console.log('📤 Submitting quick add employee form...');
+        showSpinner();
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => {
+            console.log('📥 Response status:', response.status);
+            
+            if (!response.ok) {
+                return response.text().then(text => {
+                    let errorMessage = 'Network response was not ok: ' + response.status;
+                    try {
+                        const errorData = JSON.parse(text);
+                        errorMessage = errorData.message || errorMessage;
+                    } catch (e) {
+                        if (text.includes('CSRF token mismatch')) {
+                            errorMessage = 'Session expired. Please refresh the page.';
+                        }
+                    }
+                    throw new Error(errorMessage);
+                });
+            }
+            return response.text();
+        })
+        .then(text => {
+            console.log('✅ Success response received');
+            hideSpinner();
+            isRefreshing = false;
+            
+            // Check if response is HTML (redirect) or JSON
+            try {
+                const data = JSON.parse(text);
+                if (data.success) {
+                    showSuccess(data.message || 'Employee added successfully!');
+                    form.reset();
+                    closeModal('quickAddEmployeeModal');
+                    refreshDashboardData();
+                } else {
+                    showError(data.message || 'An error occurred. Please try again.');
+                }
+            } catch (e) {
+                // If it's HTML response (redirect), assume success
+                showSuccess('Employee added successfully!');
+                form.reset();
+                closeModal('quickAddEmployeeModal');
+                refreshDashboardData();
+            }
+        })
+        .catch(error => {
+            console.error('❌ Fetch error:', error);
+            hideSpinner();
+            isRefreshing = false;
+            showError(error.message || 'Failed to add employee. Please try again.');
+        });
+    }
+
+    // Quick Action Form Submission (for other actions)
     function submitQuickActionForm(form) {
         if (isRefreshing) {
             console.log('⚠️ Already refreshing, skipping duplicate request');
