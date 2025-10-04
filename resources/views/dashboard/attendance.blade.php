@@ -139,7 +139,7 @@
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
-                        <tr class="bg-gray-50 text-gray-700 text-sm">
+                        <tr class="bg-gradient-to-r from-green-50 to-green-100 text-gray-700 text-sm">
                             <th class="py-3.5 px-6 text-left font-semibold">Employee</th>
                             <th class="py-3.5 px-6 text-left font-semibold">Date</th>
                             <th class="py-3.5 px-6 text-left font-semibold">Check In</th>

@@ -92,9 +92,23 @@ class EmployeeController extends Controller
         $allowances = Allowance::where('active', 1)->get();
         $roles = Role::all();
 
-        // AJAX response
+        // AJAX response - PASS ALL VARIABLES
         if ($request->ajax()) {
-            return $this->getEmployeesTableHtml($employees, $request);
+            return $this->getEmployeesTableHtml($employees, $request, [
+                'totalEmployees' => $totalEmployees,
+                'activeEmployeeCount' => $activeEmployeeCount,
+                'employeeGrowth' => $employeeGrowth,
+                'complianceTasksDue' => $complianceTasksDue,
+                'currentPeriod' => $currentPeriod,
+                'departments' => $departments,
+                'banks' => $banks,
+                'allowances' => $allowances,
+                'roles' => $roles,
+                'userRole' => $userRole,
+                'search' => $search,
+                'department' => $department,
+                'status' => $status
+            ]);
         }
 
         return view('dashboard.employee', compact(
@@ -849,10 +863,27 @@ class EmployeeController extends Controller
     }
 
     /**
-     * Get employees table HTML for AJAX requests
+     * Get employees table HTML for AJAX requests - FIXED VERSION
      */
-    private function getEmployeesTableHtml($employees, $request)
+    private function getEmployeesTableHtml($employees, $request, $additionalData = [])
     {
-        return view('dashboard.employee', compact('employees', 'request'))->fragment('employeesTable');
+        // Pass all required variables to the view
+        return view('dashboard.employee', array_merge([
+            'employees' => $employees,
+            'request' => $request,
+            'totalEmployees' => $additionalData['totalEmployees'] ?? 0,
+            'activeEmployeeCount' => $additionalData['activeEmployeeCount'] ?? 0,
+            'employeeGrowth' => $additionalData['employeeGrowth'] ?? 0,
+            'complianceTasksDue' => $additionalData['complianceTasksDue'] ?? 0,
+            'currentPeriod' => $additionalData['currentPeriod'] ?? Carbon::now()->format('F Y'),
+            'departments' => $additionalData['departments'] ?? [],
+            'banks' => $additionalData['banks'] ?? [],
+            'allowances' => $additionalData['allowances'] ?? [],
+            'roles' => $additionalData['roles'] ?? [],
+            'userRole' => $additionalData['userRole'] ?? null,
+            'search' => $additionalData['search'] ?? '',
+            'department' => $additionalData['department'] ?? '',
+            'status' => $additionalData['status'] ?? ''
+        ], $additionalData))->fragment('employeesTable');
     }
 }

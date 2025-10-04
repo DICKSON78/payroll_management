@@ -229,8 +229,8 @@
                                 </td>
                                 <td class="py-4 px-6">
                                     <div class="flex items-center">
-                                        <div class="flex-shrink-0 h-8 w-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mr-3 shadow-sm">
-                                            <span class="font-medium text-white text-xs">{{ $report->employee ? substr($report->employee->name, 0, 1) : 'A' }}</span>
+                                        <div class="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                                            <span class="font-medium text-green-800 text-xs">{{ $report->employee ? substr($report->employee->name, 0, 1) : 'A' }}</span>
                                         </div>
                                         <div>
                                             <div class="font-medium text-gray-600 text-sm">{{ $report->employee->name ?? 'All Employees' }}</div>

@@ -107,21 +107,12 @@ class DashboardController extends Controller
                 $pendingTasks = 0;
             }
 
-            // Additional stats for employee dashboard
-            $recentTransactions = Transaction::where('employee_id', $user->employee_id)
-                ->orderBy('transaction_date', 'desc')
-                ->take(5)
-                ->get();
-
-            $attendanceStats = $this->getEmployeeAttendanceStats($user->employee_id);
-
             return view('dashboard.dashboard', compact(
                 'totalEmployees', 'monthlyPayroll', 'employeeGrowth',
                 'payslipsGenerated', 'pendingTasks', 'settings', 'currentPeriod',
                 'isAdminOrHR', 'payrollGrowth', 'recentPayslips',
                 'employees', 'employeesForExport', 'chartLabels', 'chartData',
-                'departments', 'banks', 'allowances', 'roles', 'deductions',
-                'recentTransactions', 'attendanceStats'
+                'departments', 'banks', 'allowances', 'roles', 'deductions'
             ));
         }
 
@@ -140,81 +131,201 @@ class DashboardController extends Controller
         
         $pendingTasks = ComplianceTask::where('status', 'pending')->count();
 
-        // Additional statistics for admin dashboard
-        $totalDepartments = Department::count();
-        $activePayrolls = Payroll::where('status', 'processed')->count();
-        $recentTransactions = Transaction::orderBy('transaction_date', 'desc')->take(5)->get();
-        $unreadAlerts = PayrollAlert::where('status', 'unread')->count();
-        $pendingLeaveRequests = LeaveRequest::where('status', 'pending')->count();
-
-        // Department-wise employee count
-        $departmentStats = Employee::select('department', \DB::raw('COUNT(*) as count'))
-            ->groupBy('department')
-            ->get();
-
-        // Report types from schema
-        $reportTypes = collect([
-            'payslip' => 'Payslip',
-            'payroll_summary' => 'Payroll Summary',
-            'tax_report' => 'Tax Report',
-            'nssf_report' => 'NSSF Report',
-            'nhif_report' => 'NHIF Report',
-            'wcf_report' => 'WCF Report',
-            'sdl_report' => 'SDL Report',
-            'year_end_summary' => 'Year End Summary'
-        ])->map(function ($name, $type) {
-            return (object) ['type' => $type, 'name' => $name];
-        });
-
-        // Compliance types from schema
-        $complianceTypes = collect([
-            'PAYE' => 'PAYE',
-            'NSSF' => 'NSSF',
-            'NHIF' => 'NHIF',
-            'WCF' => 'WCF',
-            'SDL' => 'SDL'
-        ])->map(function ($name, $type) {
-            return (object) ['type' => $type, 'name' => $name];
-        });
-
         return view('dashboard.dashboard', compact(
             'totalEmployees', 'monthlyPayroll', 'employeeGrowth', 'payslipsGenerated',
             'pendingTasks', 'settings', 'currentPeriod', 'isAdminOrHR', 'payrollGrowth',
-            'recentPayslips', 'departments', 'banks', 'complianceTypes', 'reportTypes',
+            'recentPayslips', 'departments', 'banks',
             'employees', 'employeesForExport', 'chartLabels', 'chartData',
-            'allowances', 'roles', 'deductions', 'totalDepartments', 'activePayrolls',
-            'recentTransactions', 'unreadAlerts', 'pendingLeaveRequests', 'departmentStats'
+            'allowances', 'roles', 'deductions'
         ));
     }
 
     /**
-     * Handle Quick Actions from Dashboard
+     * Refresh dashboard data after quick actions - FIXED JSON RESPONSE
+     */
+    public function refreshDashboardData(Request $request)
+    {
+        try {
+            // Ensure the request is AJAX
+            if (!$request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid request type'
+                ], 400);
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            $isAdminOrHR = in_array(strtolower($user->role ?? ''), ['admin', 'hr']);
+            $isEmployee = strtolower($user->role ?? '') === 'employee';
+
+            if ($isEmployee && !$isAdminOrHR) {
+                $totalEmployees = 1;
+                $employeeGrowth = 0;
+                $monthlyPayroll = $user->base_salary ?? 0;
+                $payrollGrowth = 0;
+                $payslipsGenerated = Payslip::where('employee_id', $user->employee_id)
+                    ->whereMonth('created_at', Carbon::now()->month)
+                    ->whereYear('created_at', Carbon::now()->year)
+                    ->count();
+                $pendingTasks = 0;
+                try {
+                    if (class_exists(ComplianceTask::class) && Schema::hasTable('compliance_tasks')) {
+                        $pendingTasks = ComplianceTask::where('employee_id', $user->employee_id)
+                            ->where('status', 'pending')
+                            ->count();
+                    }
+                } catch (\Exception $e) {
+                    $pendingTasks = 0;
+                }
+            } else {
+                $totalEmployees = Employee::count();
+                $employeeGrowth = $this->calculateGrowth(Employee::class, 'created_at');
+                $monthlyPayroll = Payroll::whereMonth('created_at', Carbon::now()->month)
+                                         ->whereYear('created_at', Carbon::now()->year)
+                                         ->sum('net_salary');
+                $payrollGrowth = $this->calculatePayrollGrowth();
+                $payslipsGenerated = Payslip::whereMonth('created_at', Carbon::now()->month)
+                                            ->whereYear('created_at', Carbon::now()->year)
+                                            ->count();
+                $pendingTasks = ComplianceTask::where('status', 'pending')->count();
+            }
+
+            // Get recent payslips
+            $recentPayslips = Payslip::select(
+                    'payslips.*',
+                    'employees.department',
+                    'employees.position',
+                    'employees.email'
+                )
+                ->leftJoin('employees', 'payslips.employee_id', '=', 'employees.employee_id')
+                ->latest()
+                ->take(5)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'totalEmployees' => $totalEmployees,
+                    'employeeGrowth' => $employeeGrowth,
+                    'monthlyPayroll' => $monthlyPayroll,
+                    'payrollGrowth' => $payrollGrowth,
+                    'payslipsGenerated' => $payslipsGenerated,
+                    'pendingTasks' => $pendingTasks,
+                    'recentPayslips' => $recentPayslips->map(function($payslip) {
+                        return [
+                            'employee_name' => $payslip->employee_name ?? 'N/A',
+                            'department' => $payslip->department ?? 'N/A',
+                            'position' => $payslip->position ?? 'N/A',
+                            'net_salary' => $payslip->net_salary ?? 0,
+                            'status' => $payslip->status ?? 'N/A'
+                        ];
+                    })->toArray()
+                ]
+            ], 200, [], JSON_NUMERIC_CHECK);
+
+        } catch (\Exception $e) {
+            \Log::error('Dashboard data refresh failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to refresh dashboard data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get payroll data for chart - FIXED JSON RESPONSE
+     */
+    public function getPayrollData(Request $request)
+    {
+        try {
+            // Ensure the request is AJAX
+            if (!$request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid request type'
+                ], 400);
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            $isAdminOrHR = in_array(strtolower($user->role ?? ''), ['admin', 'hr']);
+            $period = $request->get('period', 6);
+
+            $labels = $this->getChartLabels($period);
+            $values = $this->getChartData($period, $user, $isAdminOrHR);
+
+            return response()->json([
+                'success' => true,
+                'labels' => $labels,
+                'values' => $values
+            ], 200, [], JSON_NUMERIC_CHECK);
+
+        } catch (\Exception $e) {
+            \Log::error('Payroll data fetch failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch payroll data'
+            ], 500);
+        }
+    }
+
+    /**
+     * Handle Quick Actions from Dashboard - FIXED JSON RESPONSE
      */
     public function quickActions(Request $request)
     {
-        $user = Auth::user();
-        $action = $request->input('action');
-
-        if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized action.'
-            ], 403);
-        }
-
         try {
+            // Ensure the request is AJAX
+            if (!$request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid request type'
+                ], 400);
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            if (!in_array(strtolower($user->role), ['admin', 'hr'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized action.'
+                ], 403);
+            }
+
+            $action = $request->input('action');
+            $data = $request->all();
+
             switch ($action) {
                 case 'quick_add_employee':
-                    return $this->quickAddEmployee($request->all());
+                    return $this->quickAddEmployee($data);
                     
                 case 'quick_run_payroll':
-                    return $this->quickRunPayroll($request->all());
+                    return $this->quickRunPayroll($data);
                     
                 case 'quick_generate_payslip':
-                    return $this->quickGeneratePayslip($request->all());
+                    return $this->quickGeneratePayslip($data);
                     
                 case 'quick_add_compliance':
-                    return $this->quickAddCompliance($request->all());
+                    return $this->quickAddCompliance($data);
                     
                 default:
                     return response()->json([
@@ -291,11 +402,15 @@ class DashboardController extends Controller
                 'success' => true,
                 'message' => 'Employee added successfully! ID: ' . $employeeId . ', Initial Password: ' . $initialPassword,
                 'employee_id' => $employeeId
-            ]);
+            ], 200, [], JSON_NUMERIC_CHECK);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            throw $e;
+            \Log::error('Quick add employee failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add employee: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -390,11 +505,15 @@ class DashboardController extends Controller
                 'success' => true,
                 'message' => 'Payroll processed for ' . $processedCount . ' employees for ' . $periodDisplay,
                 'processed_count' => $processedCount
-            ]);
+            ], 200, [], JSON_NUMERIC_CHECK);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            throw $e;
+            \Log::error('Quick run payroll failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process payroll: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -461,22 +580,26 @@ class DashboardController extends Controller
                 'success' => true,
                 'message' => 'Payslip generated successfully for ' . $employee->name,
                 'payslip_id' => $payslip->payslip_id
-            ]);
+            ], 200, [], JSON_NUMERIC_CHECK);
 
         } catch (\Exception $e) {
-            throw $e;
+            \Log::error('Quick generate payslip failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate payslip: ' . $e->getMessage()
+            ], 500);
         }
     }
 
     /**
-     * Quick Add Compliance Task
+     * Quick Add Compliance Task - FIXED NULL EMPLOYEE_ID ISSUE
      */
     private function quickAddCompliance($data)
     {
         $validator = Validator::make($data, [
             'type' => 'required|in:PAYE,NSSF,NHIF,WCF,SDL',
             'due_date' => 'required|date|after_or_equal:today',
-            'employee_id' => 'nullable|exists:employees,id',
+            'employee_id' => 'nullable|exists:employees,employee_id',
         ]);
 
         if ($validator->fails()) {
@@ -487,10 +610,13 @@ class DashboardController extends Controller
         }
 
         try {
+            // FIX: Handle empty employee_id properly
+            $employeeId = !empty($data['employee_id']) && $data['employee_id'] !== '' ? $data['employee_id'] : null;
+
             $complianceTask = ComplianceTask::create([
                 'task_id' => 'CMP-' . strtoupper(Str::random(8)),
                 'type' => $data['type'],
-                'employee_id' => $data['employee_id'] ?? null,
+                'employee_id' => $employeeId, // Use the fixed value
                 'due_date' => $data['due_date'],
                 'amount' => $data['amount'] ?? null,
                 'details' => $data['details'] ?? 'Quick compliance task created from dashboard',
@@ -502,10 +628,14 @@ class DashboardController extends Controller
                 'success' => true,
                 'message' => 'Compliance task created successfully',
                 'task_id' => $complianceTask->task_id
-            ]);
+            ], 200, [], JSON_NUMERIC_CHECK);
 
         } catch (\Exception $e) {
-            throw $e;
+            \Log::error('Quick add compliance failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create compliance task: ' . $e->getMessage()
+            ], 500);
         }
     }
 
@@ -554,71 +684,6 @@ class DashboardController extends Controller
         elseif ($taxableIncome <= 760000) return 20000 + ($taxableIncome - 520000) * 0.20;
         elseif ($taxableIncome <= 1000000) return 68000 + ($taxableIncome - 760000) * 0.25;
         else return 128000 + ($taxableIncome - 1000000) * 0.30;
-    }
-
-    public function getDashboardData(Request $request)
-    {
-        try {
-            $user = Auth::user();
-            $isAdminOrHR = in_array(strtolower($user->role ?? ''), ['admin', 'hr']);
-            $isEmployee = strtolower($user->role ?? '') === 'employee';
-
-            if ($isEmployee && !$isAdminOrHR) {
-                $totalEmployees = 1;
-                $employeeGrowth = 0;
-                $monthlyPayroll = $user->base_salary ?? 0;
-                $payrollGrowth = 0;
-                $payslipsGenerated = Payslip::where('employee_id', $user->employee_id)
-                    ->whereMonth('created_at', Carbon::now()->month)
-                    ->whereYear('created_at', Carbon::now()->year)
-                    ->count();
-                $pendingTasks = 0;
-                try {
-                    if (class_exists(ComplianceTask::class) && Schema::hasTable('compliance_tasks')) {
-                        $pendingTasks = ComplianceTask::where('employee_id', $user->employee_id)
-                            ->where('status', 'pending')
-                            ->count();
-                    }
-                } catch (\Exception $e) {
-                    $pendingTasks = 0;
-                }
-            } else {
-                $totalEmployees = Employee::count();
-                $employeeGrowth = $this->calculateGrowth(Employee::class, 'created_at');
-                $monthlyPayroll = Payroll::whereMonth('created_at', Carbon::now()->month)
-                                         ->whereYear('created_at', Carbon::now()->year)
-                                         ->sum('net_salary');
-                $payrollGrowth = $this->calculatePayrollGrowth();
-                $payslipsGenerated = Payslip::whereMonth('created_at', Carbon::now()->month)
-                                            ->whereYear('created_at', Carbon::now()->year)
-                                            ->count();
-                $pendingTasks = ComplianceTask::where('status', 'pending')->count();
-            }
-
-            return response()->json([
-                'totalEmployees' => $totalEmployees,
-                'employeeGrowth' => $employeeGrowth,
-                'monthlyPayroll' => $monthlyPayroll,
-                'payrollGrowth' => $payrollGrowth,
-                'payslipsGenerated' => $payslipsGenerated,
-                'pendingTasks' => $pendingTasks,
-            ], 200);
-        } catch (\Exception $e) {
-            \Log::error('Dashboard data fetch failed: ' . $e->getMessage());
-            return response()->json(['error' => 'Server error occurred'], 500);
-        }
-    }
-
-    public function getPayrollData(Request $request)
-    {
-        $user = Auth::user();
-        $isAdminOrHR = in_array(strtolower($user->role ?? ''), ['admin', 'hr']);
-        $period = $request->get('period', 6);
-
-        return response()->json([
-            'labels' => $this->getChartLabels($period),
-            'values' => $this->getChartData($period, $user, $isAdminOrHR),
-        ]);
     }
 
     private function getChartLabels($period)
@@ -703,33 +768,5 @@ class DashboardController extends Controller
         return $previous == 0
             ? ($current > 0 ? 100 : 0)
             : round((($current - $previous) / $previous) * 100, 2);
-    }
-
-    private function getEmployeeAttendanceStats($employeeId)
-    {
-        try {
-            $currentMonth = Carbon::now()->month;
-            $currentYear = Carbon::now()->year;
-
-            $presentDays = Attendance::where('employee_id', $employeeId)
-                ->whereMonth('date', $currentMonth)
-                ->whereYear('date', $currentYear)
-                ->where('status', 'Present')
-                ->count();
-
-            $totalWorkingDays = Carbon::now()->daysInMonth;
-
-            return [
-                'present_days' => $presentDays,
-                'total_days' => $totalWorkingDays,
-                'attendance_rate' => $totalWorkingDays > 0 ? round(($presentDays / $totalWorkingDays) * 100, 2) : 0
-            ];
-        } catch (\Exception $e) {
-            return [
-                'present_days' => 0,
-                'total_days' => 0,
-                'attendance_rate' => 0
-            ];
-        }
     }
 }

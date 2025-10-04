@@ -50,6 +50,18 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/data', [DashboardController::class, 'getDashboardData'])->name('dashboard.data');
+    Route::get('/payroll/data', [DashboardController::class, 'getPayrollData'])->name('payroll.data');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Quick Actions Route - Accessible by Admin/HR only
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware(['role:admin,hr'])->post('/dashboard/quick-actions', [DashboardController::class, 'quickActions'])->name('dashboard.quick-actions');
+    // Dashboard routes
+    Route::get('/dashboard/refresh-data', [DashboardController::class, 'refreshDashboardData'])->name('dashboard.refresh-data');
+    Route::post('/dashboard/quick-actions', [DashboardController::class, 'quickActions'])->name('dashboard.quick-actions');
 
     /*
     |--------------------------------------------------------------------------
@@ -58,9 +70,6 @@ Route::middleware(['auth'])->group(function () {
     | Restricted to users with 'admin' or 'hr' role.
     */
     Route::middleware(['role:admin,hr'])->prefix('admin')->group(function () {
-        // Quick Actions Route (e.g., triggering payroll)
-        Route::post('/quick-actions', [DashboardController::class, 'quickActions'])->name('dashboard.quick-actions');
-        
         // Employee Management Routes
         Route::prefix('employees')->group(function () {
             Route::get('/', [EmployeeController::class, 'index'])->name('employees.index');
@@ -101,13 +110,13 @@ Route::middleware(['auth'])->group(function () {
         // Compliance Management Routes
         Route::prefix('compliance')->group(function () {
             Route::get('/', [ComplianceController::class, 'index'])->name('compliance.index');
-            Route::get('/create', [ComplianceController::class, 'create'])->name('compliance.create');
             Route::post('/', [ComplianceController::class, 'store'])->name('compliance.store');
-            Route::get('/{task}', [ComplianceController::class, 'show'])->name('compliance.show');
-            Route::get('/{task}/edit', [ComplianceController::class, 'edit'])->name('compliance.edit');
-            Route::put('/{task}', [ComplianceController::class, 'update'])->name('compliance.update');
-            Route::delete('/{task}', [ComplianceController::class, 'destroy'])->name('compliance.destroy');
-            Route::post('/{task}/submit', [ComplianceController::class, 'submit'])->name('compliance.submit');
+            Route::get('/{id}/edit', [ComplianceController::class, 'edit'])->name('compliance.edit');
+            Route::put('/{id}', [ComplianceController::class, 'update'])->name('compliance.update');
+            Route::delete('/{id}', [ComplianceController::class, 'destroy'])->name('compliance.destroy');
+            Route::post('/{id}/submit', [ComplianceController::class, 'submit'])->name('compliance.submit');
+            Route::post('/{id}/approve', [ComplianceController::class, 'approve'])->name('compliance.approve');
+            Route::post('/{id}/reject', [ComplianceController::class, 'reject'])->name('compliance.reject');
         });
 
         // Attendance Tracking and Review Routes

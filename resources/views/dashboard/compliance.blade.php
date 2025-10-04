@@ -51,7 +51,7 @@
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead>
-                    <tr class="bg-gray-50/80 border-b border-gray-200 text-gray-600 text-sm">
+                    <tr class="bg-gradient-to-r from-green-50 to-green-100 text-gray-700 text-sm">
                         <th class="py-3.5 px-6 text-left font-semibold">Task ID</th>
                         <th class="py-3.5 px-6 text-left font-semibold">Type</th>
                         <th class="py-3.5 px-6 text-left font-semibold">Employee</th>
@@ -190,7 +190,7 @@
                             <select name="employee_id" id="employee_id" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                                 <option value="">None</option>
                                 @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }}</option>
+                                    <option value="{{ $employee->employee_id }}">{{ $employee->name }}</option>
                                 @endforeach
                             </select>
                             @error('employee_id')
@@ -273,7 +273,7 @@
                             <select name="employee_id" id="edit_employee_id" class="bg-gray-50 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                                 <option value="">None</option>
                                 @foreach($employees as $employee)
-                                    <option value="{{ $employee->id }}">{{ $employee->name }}</option>
+                                    <option value="{{ $employee->employee_id }}">{{ $employee->name }}</option>
                                 @endforeach
                             </select>
                             @error('employee_id')
